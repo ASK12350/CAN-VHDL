@@ -1,0 +1,226 @@
+
+LIBRARY ieee;
+USE ieee.std_logic_1164.ALL;
+USE ieee.numeric_std.ALL;
+
+ENTITY my_can_btl IS
+     PORT(
+	     rx              : IN std_logic;
+		   tx_in           : IN std_logic;
+		   transmitter     : IN std_logic;
+       clk             : IN std_logic; 
+	     rst             : IN std_logic;
+		   reset_mode      : IN std_logic;
+		   sam					: IN std_logic;
+	     sjw             : IN std_logic_vector(1 DOWNTO 0);
+	     brp             : IN std_logic_vector(5 DOWNTO 0);
+	     prop_seg        : IN std_logic_vector(2 DOWNTO 0);
+	     pseg1           : IN std_logic_vector(2 DOWNTO 0);
+	     pseg2           : IN std_logic_vector(2 DOWNTO 0);
+		         tx_out            : OUT std_logic;
+		         clock_en          : OUT std_logic;
+		         sample_point      : OUT std_logic;
+				     sampled_bit       : OUT std_logic;
+					   hard_sync         : OUT std_logic);
+					
+END my_can_btl;
+
+ARCHITECTURE behavioral OF my_can_btl IS
+SIGNAL sync     : std_logic;
+SIGNAL tseg1    : std_logic;
+SIGNAL tseg2    : std_logic;
+SIGNAL rx_q     : std_logic;
+SIGNAL rx_edge  : std_logic;
+SIGNAL clk_en   : std_logic;
+SIGNAL rx_idle  : std_logic;
+SIGNAL s_reg    : std_logic_vector(2 DOWNTO 0);
+SIGNAL hard_sync_temp : std_logic;
+SIGNAL nbt : integer range 0 to 30;
+SIGNAL cnt : integer range 0 to 30;
+SIGNAL cnt2 : integer range 0 to 30;
+SIGNAL delaye: integer range 0 to 5;
+SIGNAL delayl: integer range 0 to 5;
+
+BEGIN
+
+nbt  <= 4+to_integer(unsigned(prop_seg))+to_integer(unsigned(pseg1))+to_integer(unsigned(pseg2));
+hard_sync <= hard_sync_temp;
+rx_edge <= NOT(rx) AND rx_q ;
+clock_en <=clk_en;
+tx_out <=tx_in WHEN transmitter ='1' ELSE '1' ;
+ 
+PROCESS(clk)
+BEGIN
+IF(rising_edge(clk)) THEN
+ rx_q <= rx ;
+END IF;
+END PROCESS;
+
+--Hard_synchronization
+
+ Hard_syn:PROCESS(clk,rst)
+BEGIN
+IF(rst='1') THEN
+ hard_sync_temp <= '0';
+ rx_idle <= '1';
+ELSIF(rising_edge(clk)) THEN          
+ IF(reset_mode='1') THEN
+  hard_sync_temp <='0';
+  rx_idle <= '1';
+ ELSIF(rx_edge='1' and rx_idle ='1') THEN
+  hard_sync_temp <='1';
+  rx_idle <= '0';
+ ELSE
+  hard_sync_temp <='0';
+ END IF;
+END IF;
+END PROCESS Hard_syn;
+
+--Brp clock generation
+
+proc_brp:PROCESS(clk,rst)
+ BEGIN
+  IF(rst='1') THEN
+   cnt        <=  0  ;
+  ELSIF(rising_edge(clk)) THEN 
+    IF(cnt >= 2*(to_integer(unsigned(brp)))+1) THEN
+     cnt   <= 0;
+    ELSIF(hard_sync_temp='1') THEN
+	  cnt <= 0;
+	 ELSE
+     cnt   <= cnt+1;
+    END IF;
+  END IF;
+ END PROCESS proc_brp;
+ 
+ 
+ proc_brp2:PROCESS(clk)
+ BEGIN
+  IF(rising_edge(clk)) THEN
+   IF(cnt >= 2*(to_integer(unsigned(brp)))+1) THEN
+    clk_en  <= '1' ;
+   ELSE
+    clk_en  <= '0' ;
+   END IF;
+  END IF;
+ END PROCESS proc_brp2;
+ 
+ 
+ --Quant Counter
+ 
+ q_cnt:PROCESS(clk_en,rst)
+ BEGIN
+  IF(rst ='1') THEN
+   cnt2 <= 0;
+  ELSIF(rising_edge(clk_en)) THEN
+   IF(rx_idle='0') THEN
+    IF(cnt2>=nbt-1-delaye+delayl) THEN
+     cnt2 <= 0;
+    ELSE
+     cnt2 <= cnt2+1;
+    END IF;
+	ELSE 
+	 cnt2 <=0;
+   END IF;
+  END IF;
+ END PROCESS q_cnt;
+ 
+  
+ --Changing States 
+  
+ bit_state:PROCESS(clk_en,rst)
+ BEGIN
+  IF(rst='1') THEN
+   sync   <= '0';
+   tseg1  <= '0';
+   tseg2  <= '0';
+  ELSIF(rising_edge(clk_en)) THEN
+   IF(rx_idle='1') THEN
+	 sync  <='0';
+	 tseg1 <='0';
+	 tseg2 <='0';
+	ELSIF(rx_idle='0') THEN
+    IF(cnt2=0) THEN
+     tseg1 <= '1';
+     sync <= '0';
+    ELSIF(cnt2=2+to_integer(unsigned(prop_seg))+to_integer(unsigned(pseg1))+delayl) THEN
+	  tseg2 <= '1';
+     tseg1 <= '0';
+    ELSIF(cnt2>=nbt-1-delaye+delayl) THEN
+     sync  <= '1';
+     tseg2 <= '0';
+    END IF;
+   END IF;
+  END IF;
+  END PROCESS bit_state;
+  
+ --Adding or subtracting delay
+  
+  delay:PROCESS(clk,rst)
+BEGIN
+ IF(rst='1') THEN
+  delaye <=0;
+  delayl <=0;
+ ELSIF(rising_edge(clk)) THEN
+  IF(rx_edge='1') THEN
+    IF(sync='1') THEN 
+      delayl <=0;
+		delaye <=0;
+    ELSIF(tseg2='1') THEN
+      IF(to_integer(unsigned(sjw))>=nbt-1-cnt2) THEN
+       delaye  <= nbt-cnt2;
+      ELSE
+       delaye  <= 1+to_integer(unsigned(sjw)) ;
+      END IF;
+	 ELSIF(tseg1='1') THEN
+      IF(1+to_integer(unsigned(sjw)) >=cnt2) THEN
+       delayl <=cnt2;
+      ELSE
+       delayl <=1+to_integer(unsigned(sjw));
+      END IF;
+	 ELSE
+	   delayl <=0;
+		delaye <=0;
+    END IF;
+  ELSIF(cnt2=0) THEN
+   delaye <=0;
+	delayl <=0;
+  END IF;
+ END IF;
+END PROCESS delay;
+
+--Sampling
+
+sampling:PROCESS(clk_en,rst)
+VARIABLE i : integer range 0 to 3 :=0;
+BEGIN
+ IF(rst='1') THEN
+  sample_point<='0';
+ ELSIF(rising_edge(clk_en)) THEN
+   IF(sam='0') THEN
+     IF(cnt2=2+to_integer(unsigned(prop_seg))+to_integer(unsigned(pseg1))+delayl) THEN
+      sample_point <='1';
+	   sampled_bit<=rx;
+	  ELSE
+	   sample_point <='0';
+	  END IF;
+   ELSE
+	 IF((cnt2>=to_integer(unsigned(prop_seg))+to_integer(unsigned(pseg1))+delayl) and tseg1='1' ) THEN
+     s_reg(i)<=rx;
+	   IF(i=2) THEN 
+		  sampled_bit <= (((s_reg(0) and s_reg(1)) or (s_reg(1) and s_reg(2))) or (s_reg(2) and s_reg(0)));
+		  sample_point <='1';
+	    i:=0;
+	   ELSE
+		 sample_point <='0';
+	    i:=i+1;
+      END IF;
+	 ELSE
+	  sample_point <='0';
+    END IF;
+	END IF;
+ END IF;  
+END PROCESS sampling;
+
+END behavioral;
+ 
