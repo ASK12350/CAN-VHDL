@@ -1,0 +1,293 @@
+LIBRARY ieee;
+USE ieee.std_logic_1164.ALL;
+USE ieee.numeric_std.ALL;
+
+--BIT STUFFING ISN'T WORKING FOR THE FIRST BYTE
+
+ENTITY can_stuff IS
+        PORT(
+             clk             : IN std_logic;
+	          rst             : IN std_logic;
+             rx 	           : IN std_logic;
+				 tx_in           : IN std_logic_vector(7 DOWNTO 0);
+				 sampled_bit     : OUT std_logic;
+				 sampled_bit_q   : OUT std_logic;
+             new_byte        : OUT std_logic;
+             tx	           : OUT std_logic;
+				 bit_stuff_error : OUT std_logic;
+	          rx_out	        : OUT std_logic_vector(7 DOWNTO 0));
+END can_stuff ;
+
+ARCHITECTURE rtl OF can_stuff IS
+
+COMPONENT can_btl 
+    PORT(
+	rx              : IN std_logic;
+ 	clk             : IN std_logic;
+	rst             : IN std_logic;
+	sjw             : IN std_logic_vector(1 DOWNTO 0);
+	brp             : IN std_logic_vector(5 DOWNTO 0);
+	prop_seg        : IN std_logic_vector(2 DOWNTO 0);
+	tseg1           : IN std_logic_vector(2 DOWNTO 0);
+	tseg2           : IN std_logic_vector(2 DOWNTO 0);
+        sampled_bit     : OUT std_logic;
+        sampled_point   : OUT std_logic;
+        sampled_bit_q   : OUT std_logic);
+END COMPONENT;
+
+--COMPONENT can_fifo  
+--    PORT(
+--	clk		 : IN std_logic;
+--	rst		 : IN std_logic;	
+--   wr        : IN std_logic; 
+-- 	rd		    : IN std_logic;  
+--   data_in   : IN std_logic_vector(7 DOWNTO 0);                 
+--        fifo_empty       : OUT std_logic;
+-- 	     fifo_full	       : OUT std_logic;   
+--        fifo_cnt         : OUT std_logic_vector(5 DOWNTO 0);
+--	     data_out         : OUT std_logic_vector(7 DOWNTO 0));
+--
+--END COMPONENT;
+
+COMPONENT shift_reg
+	PORT(
+     clk    : IN std_logic;
+     rst    : IN std_logic;
+	  ld     : IN std_logic;
+	  d_in   : IN std_logic;
+    	   stuff1 : OUT std_logic;
+ 	      stuff0 : OUT std_logic;
+  	      d_out  : OUT std_logic);
+END COMPONENT;
+
+SIGNAL ld                  : std_logic:='1'; 
+SIGNAL stuff0              : std_logic;
+SIGNAL stuff1              : std_logic;
+SIGNAL destuff0            : std_logic;
+SIGNAL destuff1            : std_logic;
+--SIGNAL rx_in_temp          : std_logic;
+SIGNAL bit_stuff_error_temp: std_logic;
+SIGNAL tx_in_bit           : std_logic;
+--SIGNAL new_byte_temp       : std_logic;
+SIGNAL q_full              : std_logic;
+--SIGNAL tx_in_temp          : std_logic_vector(7 DOWNTO 0);
+SIGNAL temp_reg            : std_logic_vector(4 DOWNTO 0);           
+SIGNAL rx_out_temp         : std_logic_vector(7 DOWNTO 0);
+SIGNAL sjw                 : std_logic_vector(1 DOWNTO 0):="11";
+SIGNAL brp                 : std_logic_vector(5 DOWNTO 0):="000000";
+SIGNAL prop_seg            : std_logic_vector(2 DOWNTO 0):="110";
+SIGNAL tseg1               : std_logic_vector(2 DOWNTO 0):="101";
+SIGNAL tseg2               : std_logic_vector(2 DOWNTO 0):="100";
+SIGNAL sampled_point       : std_logic;
+SIGNAL i                   : integer;
+SIGNAL f                   : integer;
+SIGNAL j                   : integer;
+--SIGNAL wr_rx		           : std_logic;
+--SIGNAL rd_rx 		        : std_logic;
+--SIGNAL fifo_empty_rx       : std_logic;
+--SIGNAL fifo_full_rx	     : std_logic;
+--SIGNAL data_in_rx          : std_logic_vector(7 DOWNTO 0);                    
+--SIGNAL fifo_cnt_rx         : std_logic_vector(5 DOWNTO 0);
+--SIGNAL data_out_rx         : std_logic_vector(7 DOWNTO 0);
+--SIGNAL wr_tx		           : std_logic;
+--SIGNAL rd_tx 		        : std_logic;                 
+--SIGNAL fifo_empty_tx       : std_logic;
+--SIGNAL fifo_full_tx	     : std_logic;
+--SIGNAL data_in_tx          : std_logic_vector(7 DOWNTO 0);   
+--SIGNAL fifo_cnt_tx         : std_logic_vector(5 DOWNTO 0);
+--SIGNAL data_out_tx         : std_logic_vector(7 DOWNTO 0);
+
+BEGIN
+
+bit_stuff_error <= bit_stuff_error_temp;
+rx_out <= rx_out_temp;
+
+uushift : shift_reg PORT MAP(  clk=>clk,
+                               rst=>rst,
+										 ld=>ld,
+										 d_in=>tx_in_bit,
+										 stuff1=>stuff1,
+										 stuff0=>stuff0,
+										 d_out=>tx);
+
+
+uubtl   : can_btl PORT MAP(  rx=>rx,
+                             clk=>clk,
+									  rst=>rst,
+									  sjw=>sjw,
+									  brp=>brp,
+									  prop_seg=>prop_seg,
+									  tseg1=>tseg1,
+									  tseg2=>tseg2,
+									  sampled_bit=>sampled_bit,
+									  sampled_point=>sampled_point,
+									  sampled_bit_q=>sampled_bit_q);
+--uurxfifo  : can_fifo PORT MAP(wr=>wr_rx,rd=>rd_rx,clk=>clk,rst=>rst,data_in=>data_in_rx,fifo_empty=>fifo_empty_rx,fifo_full=>fifo_full_rx,fifo_cnt=>fifo_cnt_rx,data_out=>data_out_rx);
+--uutxfifo  : can_fifo PORT MAP(wr=>wr_tx,rd=>rd_tx,clk=>clk,rst=>rst,data_in=>data_in_tx,fifo_empty=>fifo_empty_tx,fifo_full=>fifo_full_tx,fifo_cnt=>fifo_cnt_tx,data_out=>data_out_tx);
+--PROCESS(clk)
+--BEGIN
+--IF(falling_edge(clk)) THEN
+-- tx_in_temp<=tx_in(i);
+--END IF;
+--END PROCESS;
+
+--Stuffing
+
+PROCESS(clk,rst)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
+BEGIN
+IF(rst='1') THEN
+ i<=0;
+ELSIF(falling_edge(clk)) THEN
+ IF((stuff1 or stuff0)='0') THEN
+  tx_in_bit <=tx_in(i); 
+  IF(i>=7) THEN
+   i<=0;
+  ELSE
+   i<=i+1;
+  END IF;
+ ELSIF(stuff1='1') THEN
+  tx_in_bit <='0';
+ ELSIF(stuff0='1') THEN
+  tx_in_bit <='1'; 
+ END IF;
+END IF;
+END PROCESS;
+
+--New Byte when done transmitting the previous one
+
+PROCESS(clk,rst)
+BEGIN
+IF(rst='1') THEN
+ new_byte<='0';
+ELSIF(falling_edge(clk)) THEN
+ IF(i>=7) THEN
+  new_byte <='1';
+ ELSE
+  new_byte <='0';
+ END IF;
+END IF;
+END PROCESS;
+
+--Destuffing
+
+PROCESS(sampled_point,rst)
+BEGIN
+IF(rst='1') THEN
+ j<=0;
+ bit_stuff_error_temp <='0';
+ELSIF(rising_edge(sampled_point)) THEN
+ --IF((destuff1 or destuff0)='0') THEN
+  temp_reg(0)<=rx;
+  IF(NOT (f=4) and q_full='1') THEN
+   rx_out_temp(j)<=temp_reg(4);
+   IF(j>=7) THEN
+    j<=0;
+   ELSE
+    j <=j+1;
+   END IF;
+  END IF;
+  FOR k IN 0 TO 3 LOOP
+   temp_reg(k+1)<=temp_reg(k);
+  END LOOP;
+ --ELS 
+ IF(destuff1='1') THEN
+  IF(rx='1') THEN
+   bit_stuff_error_temp <='1';
+  ELSE
+   bit_stuff_error_temp <='0';
+  END IF;
+ ELSIF(destuff0='1') THEN
+  IF(rx='0') THEN
+   bit_stuff_error_temp <='1';
+  ELSE 
+   bit_stuff_error_temp <='0';
+  END IF;
+ END IF;
+END IF;
+END PROCESS;
+
+--Setting Destuff when 5 consecutive bits are received
+
+PROCESS(sampled_point,rst)
+BEGIN
+ IF(rst='1') THEN
+  destuff0 <='0';
+  destuff1 <='0';
+ ELSIF(rising_edge(sampled_point)) THEN
+  IF(temp_reg(3 DOWNTO 0) ="1111" and rx='1') THEN
+   destuff1<='1';
+  ELSIF(temp_reg(3 DOWNTO 0)="0000" and rx='0') THEN
+   destuff0 <='1';
+  ELSE 
+   destuff0 <='0';
+   destuff1 <='0';
+  END IF;
+ END IF;
+END PROCESS;
+
+--Counting number of consecutive 0's or 1's
+
+PROCESS(sampled_point,rst) 
+BEGIN
+IF(rst='1') THEN
+ f<=1;
+ELSIF(rising_edge(sampled_point)) THEN
+ IF(temp_reg="00000") THEN
+  f <=0;
+ ELSIF(temp_reg="11111") THEN
+  f <=0;
+ ELSE
+  f <=f+1;
+ END IF;
+END IF;
+END PROCESS;
+
+--Checking if the shift register is filled
+
+PROCESS(clk,rst)
+BEGIN
+IF(rst='1') THEN
+ q_full <='0';
+ELSIF(falling_edge(clk)) THEN
+ IF(temp_reg(4)='1' or temp_reg(4)='0') THEN
+  q_full<='1';
+ ELSE
+  q_full<='0';
+ END IF;
+END IF;
+END PROCESS;
+
+--Writing into FIFO
+
+--PROCESS(clk,rst)
+--BEGIN
+--IF(rst='1') THEN
+-- wr_rx<='0';
+--ELSIF(falling_edge(clk)) THEN
+-- IF(j=0) THEN
+--  wr_rx<='1';
+--  data_in_rx <=rx_out_temp;
+-- ELSE 
+--  wr_rx<='0';
+-- END IF;
+--END IF;
+--END PROCESS;
+
+--Reading from FIFO
+
+--PROCESS(clk,rst)
+--BEGIN
+--IF(rst='1') THEN
+-- rd_tx<='0';
+--ELSIF(falling_edge(clk)) THEN
+-- IF(new_byte_temp='1') THEN
+--  rd_tx<='1';
+--  data_out_tx <= tx_in_temp;
+-- ELSE 
+--  rd_tx <='0';
+-- END IF;
+--END IF;
+--END PROCESS;
+
+
+END rtl;
