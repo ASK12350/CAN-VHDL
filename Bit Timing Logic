@@ -6,12 +6,12 @@ USE ieee.numeric_std.ALL;
 ENTITY my_can_btl IS
      PORT(
 	     rx              : IN std_logic; 
-	     tx_in           : IN std_logic;
-             transmitter     : IN std_logic;
-             clk             : IN std_logic; 
+		  tx_in           : IN std_logic;
+		  transmitter     : IN std_logic;
+        clk             : IN std_logic; 
 	     rst             : IN std_logic;
-             reset_mode      : IN std_logic;
-	     sam	     : IN std_logic;
+		  reset_mode      : IN std_logic;
+		  sam					: IN std_logic;
 	     sjw             : IN std_logic_vector(1 DOWNTO 0);
 	     brp             : IN std_logic_vector(5 DOWNTO 0);
 	     prop_seg        : IN std_logic_vector(2 DOWNTO 0);
@@ -20,15 +20,17 @@ ENTITY my_can_btl IS
 		         tx_out            : OUT std_logic;
 		         clock_en          : OUT std_logic;
 		         sample_point      : OUT std_logic;
-			 sampled_bit       : OUT std_logic;
-			 hard_sync         : OUT std_logic);
+					sampled_bit       : OUT std_logic;
+					hard_sync         : OUT std_logic);
 					
 END my_can_btl;
 
 ARCHITECTURE behavioral OF my_can_btl IS
-SIGNAL sync     : std_logic;
-SIGNAL tseg1    : std_logic;
-SIGNAL tseg2    : std_logic;
+TYPE state IS (idle,sync,tseg1,tseg2);
+SIGNAL bit_state : state;
+--SIGNAL sync     : std_logic;
+--SIGNAL tseg1    : std_logic;
+--SIGNAL tseg2    : std_logic;
 SIGNAL rx_q     : std_logic;
 SIGNAL rx_edge  : std_logic;
 SIGNAL clk_en   : std_logic;
@@ -36,15 +38,13 @@ SIGNAL rx_idle  : std_logic;
 SIGNAL s_reg    : std_logic_vector(2 DOWNTO 0);
 SIGNAL hard_sync_temp : std_logic;
 SIGNAL rx_q_q : std_logic;
-SIGNAL nbt : integer range 0 to 30;
 SIGNAL cnt : integer range 0 to 30;
 SIGNAL cnt2 : integer range 0 to 30;
-SIGNAL delaye: integer range 0 to 5;
+SIGNAL delaye: integer range 0 to 5; 
 SIGNAL delayl: integer range 0 to 5;
-
+ 
 BEGIN
 
-nbt  <= 4+to_integer(unsigned(prop_seg))+to_integer(unsigned(pseg1))+to_integer(unsigned(pseg2));
 hard_sync <= hard_sync_temp;
 rx_edge <= NOT(rx_q) AND rx_q_q ;
 clock_en <=clk_en;
@@ -113,58 +113,43 @@ proc_brp:PROCESS(clk,rst)
   END IF;
  END PROCESS proc_brp2;
  
- 
- --Quant Counter
- 
- q_cnt:PROCESS(clk,rst)
- BEGIN
-  IF(rst ='1') THEN
-   cnt2 <= 0;
-  ELSIF(rising_edge(clk)) THEN
-    IF(clk_en='1') THEN
-      IF(rx_idle='0') THEN
-        IF(cnt2>=nbt-1-delaye+delayl) THEN
-         cnt2 <= 0;
-        ELSE
-         cnt2 <= cnt2+1;
-        END IF;
-      ELSE 
-       cnt2 <=0;
-      END IF;
-    END IF;
-  END IF;
- END PROCESS q_cnt;
- 
-  
+
  --Changing States 
   
- bit_state:PROCESS(clk,rst)
+ bit_s:PROCESS(clk,rst)
  BEGIN
   IF(rst='1') THEN
-   sync   <= '0';
-   tseg1  <= '0';
-   tseg2  <= '0';
+   bit_state <= idle;
+	cnt2 <=0;
   ELSIF(rising_edge(clk)) THEN
-    IF(clk_en='1') THEN
-      IF(rx_idle='1') THEN
-	    sync  <='0';
-	    tseg1 <='0';
-	    tseg2 <='0';
-	   ELSE
-        IF(cnt2=0) THEN
-         tseg1 <= '1';
-         sync <= '0';
-        ELSIF(cnt2=2+to_integer(unsigned(prop_seg))+to_integer(unsigned(pseg1))+delayl) THEN
-	      tseg2 <= '1';
-         tseg1 <= '0';
-        ELSIF(cnt2>=nbt-1-delaye+delayl) THEN
-         sync  <= '1';
-         tseg2 <= '0';
-        END IF;
-      END IF;
+     IF(hard_sync_temp='1') THEN
+	   bit_state<=sync;
+		cnt2<=0;
+     ELSIF(clk_en='1') THEN
+      CASE bit_state IS
+		 WHEN tseg1 =>
+		   IF(cnt2>=1+to_integer(unsigned(prop_seg))+to_integer(unsigned(pseg1))+delayl) THEN
+			 cnt2<=0;
+			 bit_state <=tseg2;
+			ELSE
+			 cnt2 <= cnt2+1;
+			END IF;
+		 WHEN tseg2 =>
+		   IF(cnt2>=to_integer(unsigned(pseg2))-delaye) THEN
+			 cnt2<=0;
+			 bit_state <=sync;
+			ELSE
+			 cnt2 <= cnt2+1;
+			END IF;
+		 WHEN sync =>
+		   bit_state <=tseg1;
+		 WHEN OTHERS=>
+		   bit_state <=idle;
+			cnt2 <=0;
+		 END CASE;
 	 END IF;
   END IF;
-  END PROCESS bit_state;
+  END PROCESS bit_s;
   
  --Adding or subtracting delay
   
@@ -175,25 +160,23 @@ BEGIN
   delayl <=0;
  ELSIF(rising_edge(clk)) THEN
    IF(rx_edge='1') THEN
-     IF(sync='1') THEN 
-       delayl <=0;
-		 delaye <=0;
-     ELSIF(tseg2='1') THEN
-       IF(to_integer(unsigned(sjw))>=nbt-1-cnt2) THEN
-        delaye  <= nbt-cnt2;
+     CASE bit_state IS
+      WHEN tseg2 =>
+       IF(to_integer(unsigned(sjw))>=to_integer(unsigned(pseg2))-cnt2) THEN
+        delaye  <= 1+to_integer(unsigned(pseg2))-cnt2;
        ELSE
         delaye  <= 1+to_integer(unsigned(sjw)) ;
        END IF;
-	  ELSIF(tseg1='1') THEN
-       IF(1+to_integer(unsigned(sjw)) >=cnt2) THEN
-        delayl <=cnt2;
+	   WHEN tseg1 =>
+       IF(to_integer(unsigned(sjw)) >=cnt2) THEN
+        delayl <=1+cnt2;
        ELSE
         delayl <=1+to_integer(unsigned(sjw));
        END IF;
-	  ELSE
-	   delayl <=0;
-		delaye <=0;
-     END IF;
+	   WHEN OTHERS =>
+	    delayl <=0;
+		 delaye <=0;
+     END CASE;
    ELSIF(cnt2=0) THEN
     delaye <=0;
 	 delayl <=0;
@@ -203,37 +186,43 @@ END PROCESS delay;
 
 --Sampling
 
+sample_t:PROCESS(clk,rst)
+VARIABLE i:integer range 0 to 3 :=0;
+BEGIN
+ IF(rst='1') THEN 
+  i:=0;
+ ELSIF(rising_edge(clk)) THEN
+  IF(clk_en='1') THEN
+    IF(cnt2>=to_integer(unsigned(prop_seg))+to_integer(unsigned(pseg1))+delayl-1 and bit_state=tseg1) THEN
+	  s_reg(i)<=rx_q;
+	   IF(i=2) THEN
+		 i:=0;
+		ELSE
+		 i:=i+1;
+		END IF;
+	 END IF;
+  END IF;
+ END IF;
+END PROCESS;
+
 sampling:PROCESS(clk,rst)
-VARIABLE i : integer range 0 to 3 :=0;
 BEGIN
  IF(rst='1') THEN
   sample_point<='0';
  ELSIF(rising_edge(clk)) THEN
    IF(clk_en='1') THEN
-     IF(sam='0') THEN
-       IF(cnt2=2+to_integer(unsigned(prop_seg))+to_integer(unsigned(pseg1))+delayl) THEN
-        sample_point <='1';
-	sampled_bit<=rx_q;
-       ELSE
-        sample_point <='0';
+	    IF((cnt2=1+to_integer(unsigned(prop_seg))+to_integer(unsigned(pseg1))+delayl) and bit_state=tseg1 ) THEN
+          sample_point <='1';
+			  IF(sam='1') THEN
+		      sampled_bit <= (((s_reg(0) and s_reg(1)) or (s_reg(1) and s_reg(2))) or (s_reg(2) and s_reg(0)));
+	        ELSE
+			   sampled_bit <=rx_q;
+			  END IF;
+	    ELSE
+		  sample_point <='0';
        END IF;
-     ELSE 
-       IF((cnt2>=to_integer(unsigned(prop_seg))+to_integer(unsigned(pseg1))+delayl) and tseg1='1' ) THEN
-        s_reg(i)<=rx_q; 
-	 IF(i=2) THEN 
-	   sampled_bit <= (((s_reg(0) and s_reg(1)) or (s_reg(1) and s_reg(2))) or (s_reg(2) and s_reg(0)));
-	   sample_point <='1';
-	   i:=0;
-        ELSE
-         sample_point <='0'; 
-	 i:=i+1;
-        END IF;
-      ELSE
-       sample_point <='0';
-      END IF;
-    END IF;
-  END IF;
-END IF;  
+   END IF;
+ END IF;  
 END PROCESS sampling;
 
 END behavioral;
