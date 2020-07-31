@@ -21,7 +21,7 @@ ENTITY my_can_btl IS
 		         clock_en          : OUT std_logic;
 		         sample_point      : OUT std_logic;
 					sampled_bit       : OUT std_logic;
-					hard_sync         : OUT std_logic);
+					hard_sync         : OUT std_logic); 
 					
 END my_can_btl;
 
@@ -38,8 +38,8 @@ SIGNAL rx_idle  : std_logic;
 SIGNAL s_reg    : std_logic_vector(2 DOWNTO 0);
 SIGNAL hard_sync_temp : std_logic;
 SIGNAL rx_q_q : std_logic;
-SIGNAL cnt : integer range 0 to 30;
-SIGNAL cnt2 : integer range 0 to 30;
+SIGNAL cnt : integer range 0 to 127;
+SIGNAL cnt2 : integer range 0 to 20;
 SIGNAL delaye: integer range 0 to 5; 
 SIGNAL delayl: integer range 0 to 5;
  
@@ -135,7 +135,7 @@ proc_brp:PROCESS(clk,rst)
 			 cnt2 <= cnt2+1;
 			END IF;
 		 WHEN tseg2 =>
-		   IF(cnt2>=to_integer(unsigned(pseg2))-delaye) THEN
+		   IF(cnt2+delaye>=to_integer(unsigned(pseg2))) THEN
 			 cnt2<=0;
 			 bit_state <=sync;
 			ELSE
@@ -162,7 +162,7 @@ BEGIN
    IF(rx_edge='1') THEN
      CASE bit_state IS
       WHEN tseg2 =>
-       IF(to_integer(unsigned(sjw))>=to_integer(unsigned(pseg2))-cnt2) THEN
+       IF(to_integer(unsigned(sjw))+cnt2>=to_integer(unsigned(pseg2))) THEN
         delaye  <= 1+to_integer(unsigned(pseg2))-cnt2;
        ELSE
         delaye  <= 1+to_integer(unsigned(sjw)) ;
@@ -193,7 +193,7 @@ BEGIN
   i:=0;
  ELSIF(rising_edge(clk)) THEN
   IF(clk_en='1') THEN
-    IF(cnt2>=to_integer(unsigned(prop_seg))+to_integer(unsigned(pseg1))+delayl-1 and bit_state=tseg1) THEN
+    IF(cnt2+1>=(to_integer(unsigned(prop_seg))+to_integer(unsigned(pseg1))+delayl) and bit_state=tseg1) THEN
 	  s_reg(i)<=rx_q;
 	   IF(i=2) THEN
 		 i:=0;
