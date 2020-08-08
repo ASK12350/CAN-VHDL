@@ -1,293 +1,639 @@
 LIBRARY ieee;
-USE ieee.std_logic_1164.ALL;
-USE ieee.numeric_std.ALL;
+USE IEEE.std_logic_1164.ALL;
+USE IEEE.numeric_std.ALL;
 
---BIT STUFFING ISN'T WORKING FOR THE FIRST BYTE
-
-ENTITY can_stuff IS
-        PORT(
-             clk             : IN std_logic;
-	          rst             : IN std_logic;
-             rx 	           : IN std_logic;
-				 tx_in           : IN std_logic_vector(7 DOWNTO 0);
-				 sampled_bit     : OUT std_logic;
-				 sampled_bit_q   : OUT std_logic;
-             new_byte        : OUT std_logic;
-             tx	           : OUT std_logic;
-				 bit_stuff_error : OUT std_logic;
-	          rx_out	        : OUT std_logic_vector(7 DOWNTO 0));
-END can_stuff ;
-
-ARCHITECTURE rtl OF can_stuff IS
-
-COMPONENT can_btl 
+ENTITY my_can_bsp IS
     PORT(
-	rx              : IN std_logic;
- 	clk             : IN std_logic;
-	rst             : IN std_logic;
-	sjw             : IN std_logic_vector(1 DOWNTO 0);
-	brp             : IN std_logic_vector(5 DOWNTO 0);
-	prop_seg        : IN std_logic_vector(2 DOWNTO 0);
-	tseg1           : IN std_logic_vector(2 DOWNTO 0);
-	tseg2           : IN std_logic_vector(2 DOWNTO 0);
-        sampled_bit     : OUT std_logic;
-        sampled_point   : OUT std_logic;
-        sampled_bit_q   : OUT std_logic);
-END COMPONENT;
+	     clk          : IN std_logic;
+		  rst          : IN std_logic;
+		  clk_en       : IN std_logic;
+		  hard_sync    : IN std_logic;
+		  sample_point : IN std_logic;
+		  sampled_bit  : IN std_logic;
+		  sampled_bit_q: IN std_logic;
+		    reset_mode : OUT std_logic;
+		       data    : OUT std_logic_vector(7 DOWNTO 0));
+END my_can_bsp;
 
---COMPONENT can_fifo  
---    PORT(
---	clk		 : IN std_logic;
---	rst		 : IN std_logic;	
---   wr        : IN std_logic; 
--- 	rd		    : IN std_logic;  
---   data_in   : IN std_logic_vector(7 DOWNTO 0);                 
---        fifo_empty       : OUT std_logic;
--- 	     fifo_full	       : OUT std_logic;   
---        fifo_cnt         : OUT std_logic_vector(5 DOWNTO 0);
---	     data_out         : OUT std_logic_vector(7 DOWNTO 0));
---
---END COMPONENT;
+ARCHITECTURE behavioral OF my_can_bsp IS
 
-COMPONENT shift_reg
-	PORT(
-     clk    : IN std_logic;
-     rst    : IN std_logic;
-	  ld     : IN std_logic;
-	  d_in   : IN std_logic;
-    	   stuff1 : OUT std_logic;
- 	      stuff0 : OUT std_logic;
-  	      d_out  : OUT std_logic);
-END COMPONENT;
+SIGNAL go_rx_id1    : std_logic;
+SIGNAL go_rx_id2    : std_logic;
+SIGNAL go_rx_rtr1   : std_logic;
+SIGNAL go_rx_ide    : std_logic;
+SIGNAL go_rx_rtr2   : std_logic;
+SIGNAL go_rx_rb0    : std_logic;
+SIGNAL go_rx_rb1    : std_logic;
+SIGNAL go_rx_dlc    : std_logic;
+SIGNAL go_rx_data   : std_logic;
+SIGNAL go_rx_crc    : std_logic;
+SIGNAL go_rx_crc_de : std_logic;
+SIGNAL go_rx_ack    : std_logic;
+SIGNAL go_rx_ack_de : std_logic;
+SIGNAL go_rx_eof    : std_logic;
+SIGNAL go_rx_idle   : std_logic;
+SIGNAL go_rx_inter  : std_logic;
+SIGNAL go_rx_error  : std_logic;
+SIGNAL go_rx_presof : std_logic;
+SIGNAL go_rx_sof    : std_logic;
+SIGNAl rx_idle      : std_logic;
+SIGNAL rx_inter     : std_logic;
+SIGNAL rx_error     : std_logic;
+SIGNAL rx_presof    : std_logic;
+SIGNAL rx_sof       : std_logic;
+SIGNAL rx_id1       : std_logic;
+SIGNAL rx_id2       : std_logic;
+SIGNAL rx_rtr1      : std_logic;
+SIGNAL rx_ide       : std_logic;
+SIGNAL rx_rtr2      : std_logic;
+SIGNAL rx_rb0       : std_logic;
+SIGNAL rx_rb1       : std_logic;
+SIGNAL rx_dlc       : std_logic;
+SIGNAL rx_data      : std_logic;
+SIGNAL rx_crc       : std_logic;
+SIGNAL rx_crc_de    : std_logic;
+SIGNAL rx_ack       : std_logic;
+SIGNAL rx_ack_de    : std_logic;
+SIGNAL rx_eof       : std_logic;
+SIGNAL id1          : std_logic_vector(10 DOWNTO 0);
+SIGNAL id2          : std_logic_vector(17 DOWNTO 0);
+SIGNAL rtr1         : std_logic;
+SIGNAL ide          : std_logic;
+SIGNAL rtr2         : std_logic;
+SIGNAL rb0          : std_logic;
+SIGNAL rb1          : std_logic;
+SIGNAL dlc          : std_logic_vector(3 DOWNTO 0);
+SIGNAL data_temp    : std_logic_vector(7 DOWNTO 0);
+SIGNAL crc          : std_logic_vector(14 DOWNTO 0);
+SIGNAL crc_de       : std_logic;
+SIGNAL ack          : std_logic;
+SIGNAL ack_de       : std_logic;
+SIGNAL destuff_cnt  : integer range 0 to 5;
+SIGNAL destuff      : std_logic;
+SIGNAL dlc_int     : integer range 0 to 63;
+SIGNAL cnt : integer range 0 to 63;
+SIGNAL wr : std_logic;
+TYPE data_array IS ARRAY(0 TO 7) OF std_logic_vector(7 DOWNTO 0);
+SIGNAL i : integer range  0 to 7;
+SIGNAL data_fifo : data_array;
+--SIGNAL sample_point_q : std_logic;
 
-SIGNAL ld                  : std_logic:='1'; 
-SIGNAL stuff0              : std_logic;
-SIGNAL stuff1              : std_logic;
-SIGNAL destuff0            : std_logic;
-SIGNAL destuff1            : std_logic;
---SIGNAL rx_in_temp          : std_logic;
-SIGNAL bit_stuff_error_temp: std_logic;
-SIGNAL tx_in_bit           : std_logic;
---SIGNAL new_byte_temp       : std_logic;
-SIGNAL q_full              : std_logic;
---SIGNAL tx_in_temp          : std_logic_vector(7 DOWNTO 0);
-SIGNAL temp_reg            : std_logic_vector(4 DOWNTO 0);           
-SIGNAL rx_out_temp         : std_logic_vector(7 DOWNTO 0);
-SIGNAL sjw                 : std_logic_vector(1 DOWNTO 0):="11";
-SIGNAL brp                 : std_logic_vector(5 DOWNTO 0):="000000";
-SIGNAL prop_seg            : std_logic_vector(2 DOWNTO 0):="110";
-SIGNAL tseg1               : std_logic_vector(2 DOWNTO 0):="101";
-SIGNAL tseg2               : std_logic_vector(2 DOWNTO 0):="100";
-SIGNAL sampled_point       : std_logic;
-SIGNAL i                   : integer;
-SIGNAL f                   : integer;
-SIGNAL j                   : integer;
---SIGNAL wr_rx		           : std_logic;
---SIGNAL rd_rx 		        : std_logic;
---SIGNAL fifo_empty_rx       : std_logic;
---SIGNAL fifo_full_rx	     : std_logic;
---SIGNAL data_in_rx          : std_logic_vector(7 DOWNTO 0);                    
---SIGNAL fifo_cnt_rx         : std_logic_vector(5 DOWNTO 0);
---SIGNAL data_out_rx         : std_logic_vector(7 DOWNTO 0);
---SIGNAL wr_tx		           : std_logic;
---SIGNAL rd_tx 		        : std_logic;                 
---SIGNAL fifo_empty_tx       : std_logic;
---SIGNAL fifo_full_tx	     : std_logic;
---SIGNAL data_in_tx          : std_logic_vector(7 DOWNTO 0);   
---SIGNAL fifo_cnt_tx         : std_logic_vector(5 DOWNTO 0);
---SIGNAL data_out_tx         : std_logic_vector(7 DOWNTO 0);
-
+FUNCTION conv(b: boolean) return std_logic IS
 BEGIN
-
-bit_stuff_error <= bit_stuff_error_temp;
-rx_out <= rx_out_temp;
-
-uushift : shift_reg PORT MAP(  clk=>clk,
-                               rst=>rst,
-										 ld=>ld,
-										 d_in=>tx_in_bit,
-										 stuff1=>stuff1,
-										 stuff0=>stuff0,
-										 d_out=>tx);
-
-
-uubtl   : can_btl PORT MAP(  rx=>rx,
-                             clk=>clk,
-									  rst=>rst,
-									  sjw=>sjw,
-									  brp=>brp,
-									  prop_seg=>prop_seg,
-									  tseg1=>tseg1,
-									  tseg2=>tseg2,
-									  sampled_bit=>sampled_bit,
-									  sampled_point=>sampled_point,
-									  sampled_bit_q=>sampled_bit_q);
---uurxfifo  : can_fifo PORT MAP(wr=>wr_rx,rd=>rd_rx,clk=>clk,rst=>rst,data_in=>data_in_rx,fifo_empty=>fifo_empty_rx,fifo_full=>fifo_full_rx,fifo_cnt=>fifo_cnt_rx,data_out=>data_out_rx);
---uutxfifo  : can_fifo PORT MAP(wr=>wr_tx,rd=>rd_tx,clk=>clk,rst=>rst,data_in=>data_in_tx,fifo_empty=>fifo_empty_tx,fifo_full=>fifo_full_tx,fifo_cnt=>fifo_cnt_tx,data_out=>data_out_tx);
---PROCESS(clk)
---BEGIN
---IF(falling_edge(clk)) THEN
--- tx_in_temp<=tx_in(i);
---END IF;
---END PROCESS;
-
---Stuffing
-
-PROCESS(clk,rst)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
-BEGIN
-IF(rst='1') THEN
- i<=0;
-ELSIF(falling_edge(clk)) THEN
- IF((stuff1 or stuff0)='0') THEN
-  tx_in_bit <=tx_in(i); 
-  IF(i>=7) THEN
-   i<=0;
+  IF b THEN
+   return('1');
   ELSE
-   i<=i+1;
+   return ('0'); 
   END IF;
- ELSIF(stuff1='1') THEN
-  tx_in_bit <='0';
- ELSIF(stuff0='1') THEN
-  tx_in_bit <='1'; 
- END IF;
-END IF;
-END PROCESS;
+END ;
 
---New Byte when done transmitting the previous one
-
-PROCESS(clk,rst)
-BEGIN
-IF(rst='1') THEN
- new_byte<='0';
-ELSIF(falling_edge(clk)) THEN
- IF(i>=7) THEN
-  new_byte <='1';
- ELSE
-  new_byte <='0';
- END IF;
-END IF;
-END PROCESS;
-
---Destuffing
-
-PROCESS(sampled_point,rst)
-BEGIN
-IF(rst='1') THEN
- j<=0;
- bit_stuff_error_temp <='0';
-ELSIF(rising_edge(sampled_point)) THEN
- --IF((destuff1 or destuff0)='0') THEN
-  temp_reg(0)<=rx;
-  IF(NOT (f=4) and q_full='1') THEN
-   rx_out_temp(j)<=temp_reg(4);
-   IF(j>=7) THEN
-    j<=0;
-   ELSE
-    j <=j+1;
-   END IF;
-  END IF;
-  FOR k IN 0 TO 3 LOOP
-   temp_reg(k+1)<=temp_reg(k);
+FUNCTION orv(s:std_logic_vector(3 DOWNTO 0)) return std_logic IS
+VARIABLE temp : std_logic:='0';
+BEGIN 
+  FOR i IN 0 TO 2 LOOP
+   temp:=temp or s(i);
   END LOOP;
- --ELS 
- IF(destuff1='1') THEN
-  IF(rx='1') THEN
-   bit_stuff_error_temp <='1';
+  IF(temp='1') THEN
+   return ('1'); 
   ELSE
-   bit_stuff_error_temp <='0';
+   return ('0');
   END IF;
- ELSIF(destuff0='1') THEN
-  IF(rx='0') THEN
-   bit_stuff_error_temp <='1';
-  ELSE 
-   bit_stuff_error_temp <='0';
-  END IF;
- END IF;
-END IF;
-END PROCESS;
+END;
 
---Setting Destuff when 5 consecutive bits are received
-
-PROCESS(sampled_point,rst)
 BEGIN
- IF(rst='1') THEN
-  destuff0 <='0';
-  destuff1 <='0';
- ELSIF(rising_edge(sampled_point)) THEN
-  IF(temp_reg(3 DOWNTO 0) ="1111" and rx='1') THEN
-   destuff1<='1';
-  ELSIF(temp_reg(3 DOWNTO 0)="0000" and rx='0') THEN
-   destuff0 <='1';
-  ELSE 
-   destuff0 <='0';
-   destuff1 <='0';
-  END IF;
- END IF;
-END PROCESS;
 
---Counting number of consecutive 0's or 1's
 
-PROCESS(sampled_point,rst) 
+dlc_int <=63 WHEN dlc(3)='1' ELSE
+          to_integer(8*unsigned(dlc))-1;
+ 
+go_rx_presof <= hard_sync and (rx_idle or rx_inter);
+go_rx_sof    <= (sample_point and rx_presof);
+go_rx_id1    <= (sample_point and rx_sof);
+go_rx_rtr1   <= (sample_point and rx_id1 and not(destuff))and conv(cnt=10);
+go_rx_ide    <= (sample_point and rx_rtr1 and not(destuff));
+go_rx_id2    <= (sample_point and rx_ide) and sampled_bit_q and not(destuff);
+go_rx_rtr2   <= (sample_point and rx_id2) and not(destuff) and conv(cnt=17);
+go_rx_rb0    <=  sample_point and ((not(sampled_bit_q) and rx_ide) or (ide and rx_rb1));
+go_rx_rb1    <= (sample_point and rx_rtr2 and ide) and not(destuff); 
+go_rx_dlc    <= (sample_point and rx_rb0) and not(destuff);
+go_rx_data   <= (sample_point and not(destuff)) and (conv(cnt=3)  and rx_dlc and (orv(dlc) or sampled_bit_q));
+go_rx_crc    <= ((sample_point and ((rx_data and conv(cnt=dlc_int)) or (rx_dlc and conv(cnt=3) and not(orv(dlc) or sampled_bit_q)))) and not(destuff)) ;
+go_rx_crc_de <= (sample_point and rx_crc) and conv(cnt=14) and not(destuff);
+go_rx_ack    <= (sample_point and rx_crc_de);
+go_rx_ack_de <= (sample_point and rx_ack);
+go_rx_eof    <= (sample_point and rx_ack_de);
+go_rx_inter  <= (sample_point and rx_eof) and conv(cnt=6);
+go_rx_idle   <= (sample_point and rx_inter) and conv(cnt=2);
+
+
+--PROCESS(clk,rst)
+--BEGIN
+--  IF(rst='1') THEN 
+--   sample_point_q<='0';
+-- ELSIF(rising_edge(clk)) THEN
+--   sample_point_q <=sample_point;
+-- END IF;
+--END PROCESS;
+
+PROCESS(clk,rst,rx_idle)
 BEGIN
-IF(rst='1') THEN
- f<=1;
-ELSIF(rising_edge(sampled_point)) THEN
- IF(temp_reg="00000") THEN
-  f <=0;
- ELSIF(temp_reg="11111") THEN
-  f <=0;
- ELSE
-  f <=f+1;
- END IF;
-END IF;
+  IF((rst or rx_idle)='1') THEN
+   data_fifo<=(others=>(others=>'0'));
+  ELSIF(rising_edge(clk)) THEN
+    IF(wr='1') THEN
+	  data_fifo(i)<=data_temp;
+	 END IF;
+  END IF;
 END PROCESS;
 
---Checking if the shift register is filled
+PROCESS(clk,rst,rx_idle)
+BEGIN
+  IF((rst or rx_idle)='1') THEN
+   i<=0;
+  ELSIF(rising_edge(clk)) THEN
+    IF(wr='1') THEN
+ 	  i<=i+1;
+	 END IF;
+  END IF;
+END PROCESS;
+
+
+PROCESS(clk,rst,rx_idle)
+BEGIN
+  IF((rst or rx_idle)='1') THEN
+   wr<='0';
+  ELSIF(rising_edge(clk)) THEN
+    IF((sample_point and rx_data) ='1') THEN 
+	   IF(to_unsigned(cnt,6)(2 DOWNTO 0)="111") THEN
+		 wr<='1';
+		END IF;
+	 ELSE
+	  wr<='0';	
+	 END IF;
+  END IF;
+END PROCESS;
+	   
 
 PROCESS(clk,rst)
 BEGIN
-IF(rst='1') THEN
- q_full <='0';
-ELSIF(falling_edge(clk)) THEN
- IF(temp_reg(4)='1' or temp_reg(4)='0') THEN
-  q_full<='1';
- ELSE
-  q_full<='0';
- END IF;
-END IF;
+  IF(rst='1') THEN
+   cnt <=0;
+  ELSIF(rising_edge(clk)) THEN
+    IF((sample_point and not(destuff))='1') THEN
+      IF((go_rx_id1 or go_rx_id2 or go_rx_dlc or go_rx_data or go_rx_crc or go_rx_eof or go_rx_inter or go_rx_idle)='1') THEN
+       cnt <=0;		
+      ELSE
+       cnt <=cnt+1;
+      END IF;
+    END IF;		 
+  END IF;
 END PROCESS;
 
---Writing into FIFO
+PROCESS(clk,rst)
+BEGIN
+  IF(rst='1') THEN
+   rx_presof <='0';
+  ELSIF(rising_edge(clk)) THEN
+    IF(go_rx_presof='1') THEN
+ 	  rx_presof <='1';
+	 ELSIF(go_rx_sof='1') THEN
+	  rx_presof <='0';
+	 END IF;
+  END IF;
+END PROCESS;
 
---PROCESS(clk,rst)
---BEGIN
---IF(rst='1') THEN
--- wr_rx<='0';
---ELSIF(falling_edge(clk)) THEN
--- IF(j=0) THEN
---  wr_rx<='1';
---  data_in_rx <=rx_out_temp;
--- ELSE 
---  wr_rx<='0';
--- END IF;
---END IF;
---END PROCESS;
+PROCESS(clk,rst)
+BEGIN
+  IF(rst='1') THEN
+   rx_sof <='0';
+  ELSIF(rising_edge(clk)) THEN
+    IF(go_rx_sof='1') THEN
+ 	  rx_sof <= '1';
+	 ELSIF(go_rx_id1='1') THEN
+	  rx_sof <='0';
+	 END IF;
+  END IF;
+END PROCESS;
 
---Reading from FIFO
+PROCESS(clk,rst)
+BEGIN
+  IF(rst='1') THEN
+   rx_id1 <='0';
+  ELSIF(rising_edge(clk)) THEN
+    IF(go_rx_id1='1') THEN
+ 	  rx_id1 <='1';
+	 ELSIF(go_rx_rtr1='1') THEN
+	  rx_id1 <='0';
+	 END IF;
+  END IF;
+END PROCESS;
 
---PROCESS(clk,rst)
---BEGIN
---IF(rst='1') THEN
--- rd_tx<='0';
---ELSIF(falling_edge(clk)) THEN
--- IF(new_byte_temp='1') THEN
---  rd_tx<='1';
---  data_out_tx <= tx_in_temp;
--- ELSE 
---  rd_tx <='0';
--- END IF;
---END IF;
---END PROCESS;
+PROCESS(clk,rst)
+BEGIN
+  IF(rst='1') THEN
+   rx_rtr1 <='0';
+  ELSIF(rising_edge(clk)) THEN
+    IF(go_rx_rtr1='1') THEN
+ 	  rx_rtr1 <='1';
+	 ELSIF(go_rx_ide='1') THEN
+	  rx_rtr1 <='0';
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst)
+BEGIN
+  IF(rst='1') THEN
+   rx_ide <='0';
+  ELSIF(rising_edge(clk)) THEN
+    IF(go_rx_ide='1') THEN
+ 	  rx_ide <='1';
+	 ELSIF((go_rx_rb0 or go_rx_id2)='1') THEN
+	  rx_ide <='0';
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst)
+BEGIN
+  IF(rst='1') THEN
+   rx_id2 <='0';
+  ELSIF(rising_edge(clk)) THEN
+    IF(go_rx_id2='1') THEN
+ 	  rx_id2 <='1';
+	 ELSIF(go_rx_rtr2='1') THEN
+	  rx_id2 <='0';
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst)
+BEGIN
+  IF(rst='1') THEN
+   rx_rtr2 <='0';
+  ELSIF(rising_edge(clk)) THEN
+    IF(go_rx_rtr2='1') THEN
+ 	  rx_rtr2 <='1';
+	 ELSIF(go_rx_rb1='1') THEN
+	  rx_rtr2 <='0';
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst)
+BEGIN
+  IF(rst='1') THEN
+   rx_rb1 <='0';
+  ELSIF(rising_edge(clk)) THEN
+    IF(go_rx_rb1='1') THEN
+ 	  rx_rb1 <='1';
+	 ELSIF(go_rx_rb0='1') THEN
+	  rx_rb1 <='0';
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst)
+BEGIN
+  IF(rst='1') THEN
+   rx_rb0 <='0';
+  ELSIF(rising_edge(clk)) THEN
+    IF(go_rx_rb0='1') THEN
+ 	  rx_rb0 <='1';
+	 ELSIF(go_rx_dlc='1') THEN
+	  rx_rb0 <='0';
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst)
+BEGIN
+  IF(rst='1') THEN
+   rx_dlc <='0';
+  ELSIF(rising_edge(clk)) THEN
+    IF(go_rx_dlc='1') THEN
+ 	  rx_dlc <='1';
+	 ELSIF((go_rx_data or go_rx_crc)='1') THEN
+	  rx_dlc <='0';
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst)
+BEGIN
+  IF(rst='1') THEN
+   rx_data <='0';
+  ELSIF(rising_edge(clk)) THEN
+    IF(go_rx_data='1') THEN
+ 	  rx_data <='1';
+	 ELSIF(go_rx_crc='1') THEN
+	  rx_data <='0';
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst)
+BEGIN
+  IF(rst='1') THEN
+   rx_crc <='0';
+  ELSIF(rising_edge(clk)) THEN
+    IF(go_rx_crc='1') THEN
+ 	  rx_crc <='1';
+	 ELSIF(go_rx_crc_de='1') THEN
+	  rx_crc <='0';
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst)
+BEGIN
+  IF(rst='1') THEN
+   rx_crc_de <='0';
+  ELSIF(rising_edge(clk)) THEN
+    IF(go_rx_crc_de='1') THEN
+ 	  rx_crc_de <='1';
+	 ELSIF(go_rx_ack='1') THEN
+	  rx_crc_de <='0';
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst)
+BEGIN
+  IF(rst='1') THEN
+   rx_ack <='0';
+  ELSIF(rising_edge(clk)) THEN
+    IF(go_rx_ack='1') THEN
+ 	  rx_ack <='1';
+	 ELSIF(go_rx_ack_de='1') THEN
+	  rx_ack <='0';
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst)
+BEGIN
+  IF(rst='1') THEN
+   rx_ack_de <='0';
+  ELSIF(rising_edge(clk)) THEN
+    IF(go_rx_ack_de='1') THEN
+ 	  rx_ack_de <='1';
+	 ELSIF(go_rx_eof='1') THEN
+	  rx_ack_de <='0';
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst)
+BEGIN
+  IF(rst='1') THEN
+   rx_eof <='0';
+  ELSIF(rising_edge(clk)) THEN
+    IF(go_rx_eof='1') THEN
+ 	  rx_eof <='1';
+	 ELSIF(go_rx_inter='1') THEN
+	  rx_eof <='0';
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst)
+BEGIN
+  IF(rst='1') THEN
+   rx_inter <='0';
+  ELSIF(rising_edge(clk)) THEN
+    IF(go_rx_inter='1') THEN
+ 	  rx_inter <='1';
+	 ELSIF(go_rx_idle='1') THEN
+	  rx_inter <='0';
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst)
+BEGIN
+  IF(rst='1') THEN
+   rx_idle <='1';
+	reset_mode <='1';
+  ELSIF(rising_edge(clk)) THEN
+    IF(go_rx_idle='1') THEN
+ 	  rx_idle <='1';
+	  reset_mode <='1';
+	 ELSIF(go_rx_presof='1') THEN
+	  rx_idle <='0';
+	 ELSE
+	  reset_mode <='0';
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst) 
+BEGIN
+  IF(rst='1') THEN
+   id1 <= (others=>'1');
+  ELSIF(rising_edge(clk)) THEN
+    IF((rx_id1 and sample_point and not(destuff))='1') THEN
+     id1 <=	id1(9 DOWNTO 0) & sampled_bit_q;
+    ELSIF(rx_idle='1') THEN
+	  id1 <= (others=>'1');
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst) 
+BEGIN
+  IF(rst='1') THEN
+   rtr1 <= '1';
+  ELSIF(rising_edge(clk)) THEN
+    IF((rx_rtr1 and sample_point and not(destuff))='1') THEN
+     rtr1 <= sampled_bit_q;
+    ELSIF(rx_idle='1') THEN
+	  rtr1 <='1';
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst) 
+BEGIN
+  IF(rst='1') THEN
+   ide <= '1';
+  ELSIF(rising_edge(clk)) THEN
+    IF((rx_ide and sample_point and not(destuff))='1') THEN
+     ide <=	sampled_bit_q;
+    ELSIF(rx_idle='1') THEN
+	  ide <='1';
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst) 
+BEGIN
+  IF(rst='1') THEN
+   id2 <= (others=>'1');
+  ELSIF(rising_edge(clk)) THEN
+    IF((rx_id2 and sample_point and not(destuff))='1') THEN
+     id2 <=	id2(16 DOWNTO 0) & sampled_bit_q;
+    ELSIF(rx_idle='1') THEN
+	  id2 <= (others=> '1');
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst) 
+BEGIN
+  IF(rst ='1') THEN
+   rtr2 <= '1';
+  ELSIF(rising_edge(clk)) THEN
+    IF((rx_rtr2 and sample_point and not(destuff))='1') THEN
+     rtr2 <= sampled_bit_q;
+    ELSIF(rx_idle='1') THEN
+	  rtr2 <='1';
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst,rx_idle) 
+BEGIN
+  IF(rst ='1') THEN
+   rb1 <= '1';
+  ELSIF(rising_edge(clk)) THEN
+    IF((rx_rb1 and sample_point and not(destuff))='1') THEN
+     rb1 <=	sampled_bit_q;
+    ELSIF(rx_idle='1') THEN
+	  rb1 <= '1';
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst) 
+BEGIN
+  IF(rst='1') THEN
+   rb0 <= '1';
+  ELSIF(rising_edge(clk)) THEN
+    IF((rx_rb0 and sample_point and not(destuff))='1') THEN
+     rb0 <=	sampled_bit_q;
+    ELSIF(rx_idle='1') THEN
+	  rb0 <='1';
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst) 
+BEGIN
+  IF(rst ='1') THEN
+   dlc <= (others=>'1');
+  ELSIF(rising_edge(clk)) THEN
+    IF((rx_dlc and sample_point and not(destuff))='1') THEN
+     dlc <=	dlc(2 DOWNTO 0) & sampled_bit_q;
+    ELSIF(rx_idle='1') THEN
+	  dlc <=(others=>'1');
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst) 
+BEGIN
+  IF(rst='1') THEN
+   data_temp <= (others=>'1');
+  ELSIF(rising_edge(clk)) THEN
+    IF((rx_data and sample_point and not(destuff))='1') THEN
+     data_temp <= data_temp(6 DOWNTO 0) & sampled_bit_q;
+    ELSIF(rx_idle='1') THEN 
+	  data_temp <= (others=>'1');
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst) 
+BEGIN
+  IF(rst ='1') THEN
+   crc <= (others=>'1');
+  ELSIF(rising_edge(clk)) THEN
+    IF((rx_crc and sample_point and not(destuff))='1') THEN
+     crc <= crc(13 DOWNTO 0) & sampled_bit_q;
+    ELSIF(rx_idle='1') THEN
+	  crc <=(others=>'1');
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst) 
+BEGIN
+  IF(rst='1') THEN
+   crc_de <= '1';
+  ELSIF(rising_edge(clk)) THEN
+    IF((rx_crc_de and sample_point)='1') THEN
+     crc_de <= sampled_bit_q;
+    ELSIF(rx_idle='1') THEN
+	  crc_de <='1';
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst) 
+BEGIN
+  IF(rst='1') THEN
+   ack <= '1';
+  ELSIF(rising_edge(clk)) THEN
+    IF((rx_ack and sample_point )='1') THEN
+     ack <= sampled_bit_q;
+    ELSIF(rx_idle='1') THEN
+	  ack <='1';
+	 END IF;
+  END IF;
+END PROCESS;
+
+PROCESS(clk,rst) 
+BEGIN
+  IF(rst='1') THEN
+   ack_de <= '1';
+  ELSIF(rising_edge(clk)) THEN
+    IF((rx_ack_de and sample_point)='1') THEN
+     ack_de <= sampled_bit_q;
+    ELSIF(rx_idle='1') THEN 
+	  ack_de <='1';
+	 END IF;
+  END IF;
+END PROCESS;
 
 
-END rtl;
+PROCESS(clk,rst,rx_idle)
+BEGIN
+  IF((rst or rx_idle)='1') THEN
+   destuff_cnt <=0;
+  ELSIF(rising_edge(clk)) THEN
+    IF(sample_point='1') THEN
+      IF((sampled_bit xnor sampled_bit_q)='1') THEN
+	     IF(destuff_cnt=4) THEN
+	      destuff_cnt<=0;
+	     ELSE
+	      destuff_cnt<=destuff_cnt+1;
+	     END IF;
+	   ELSE
+		 destuff_cnt <=0;
+		END IF;
+    END IF;
+  END IF;
+END PROCESS;
+
+
+PROCESS(clk,rst) 
+BEGIN
+  IF(rst='1') THEN
+   destuff <='0';
+  ELSIF(rising_edge(clk)) THEN
+    IF(sample_point='1') THEN
+	   IF((rx_ack or rx_crc_de or rx_ack_de or rx_idle or rx_inter or rx_eof)='1') THEN
+	    destuff <='0';
+		ELSIF(destuff_cnt=4) THEN
+		 destuff <='1';
+		ELSE
+		 destuff <='0';
+		END IF;
+	 END IF;
+  END IF;
+END PROCESS;
+
+
+
+END behavioral; 
