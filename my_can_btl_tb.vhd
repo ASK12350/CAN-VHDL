@@ -10,7 +10,7 @@ ARCHITECTURE behavior OF my_can_btl_tb IS
  
     -- Component Declaration for the Unit Under Test (UUT)
  
-    COMPONENT my_can_btl
+    COMPONENT  my_can_btl
     PORT(
          rx           : IN  std_logic;
 			tx_in        : IN  std_logic;
@@ -21,14 +21,15 @@ ARCHITECTURE behavior OF my_can_btl_tb IS
          sam          : IN  std_logic;
          sjw          : IN  std_logic_vector(1 downto 0);
          brp          : IN  std_logic_vector(5 downto 0);
-         prop_seg     : IN  std_logic_vector(2 downto 0);
-         pseg1        : IN  std_logic_vector(2 downto 0);
-         pseg2        : IN  std_logic_vector(2 downto 0);
-			    tx_out       : OUT  std_logic;
-             clock_en     : OUT  std_logic;
-             sample_point : OUT  std_logic;
-             sampled_bit  : OUT  std_logic;
-             hard_sync    : OUT  std_logic
+         --prop_seg     : IN  std_logic_vector(2 downto 0);
+         tseg1        : IN  std_logic_vector(3 downto 0);
+         tseg2        : IN  std_logic_vector(2 downto 0);
+			    sampled_bit_q : OUT  std_logic;
+			    tx_out        : OUT  std_logic;
+             clock_en      : OUT  std_logic;
+             sample_point  : OUT  std_logic;
+             sampled_bit   : OUT  std_logic;
+             hard_sync     : OUT  std_logic
         );
     END COMPONENT;
     
@@ -38,16 +39,16 @@ ARCHITECTURE behavior OF my_can_btl_tb IS
              --MODULE 1--
    --Inputs
 	signal tx_in_1     : std_logic := '1';
-	signal t_1         : std_logic :='1';
+	signal t_1         : std_logic :='0';
    signal clk_1       : std_logic := '0';
    signal rst         : std_logic := '1';
    signal reset_mode  : std_logic := '0';
    signal sam_1       : std_logic := '0';
    signal sjw_1       : std_logic_vector(1 downto 0) := "11";
    signal brp_1       : std_logic_vector(5 downto 0) := "000100";   -- 1Tq=2*5*clk_period=2*5*10=100 ns;
-   signal prop_seg_1  : std_logic_vector(2 downto 0) := "101";
-   signal pseg1_1     : std_logic_vector(2 downto 0) := "011";   --nominal bit time=sync+prop+pseg1+pseg2=1+6+4+4=15Tqs=1500ns
-   signal pseg2_1     : std_logic_vector(2 downto 0) := "011";
+  -- signal prop_seg_1  : std_logic_vector(2 downto 0) := "101";
+   signal tseg1_1     : std_logic_vector(3 downto 0) := "1001";   --nominal bit time=sync+tseg1+pseg2=1+10+4=15Tqs=1500ns
+   signal tseg2_1     : std_logic_vector(2 downto 0) := "011";
 	signal count_1     : integer range 0 to 50:=0;
 	signal cnt         : integer range 0 to 4000:=0;
 
@@ -56,6 +57,7 @@ ARCHITECTURE behavior OF my_can_btl_tb IS
    signal clock_en_1     : std_logic;
    signal sample_point_1 : std_logic;
    signal sampled_bit_1  : std_logic;
+   signal sampled_bit_1_q  : std_logic;
    signal hard_sync_1    : std_logic;
 	
 	
@@ -68,9 +70,9 @@ ARCHITECTURE behavior OF my_can_btl_tb IS
    signal sam_2      : std_logic := '1';
    signal sjw_2      : std_logic_vector(1 downto 0) := "11";
    signal brp_2      : std_logic_vector(5 downto 0) := "000100";   -- 1Tq=2*clk_period=2*5*10.2=102 ns;
-   signal prop_seg_2 : std_logic_vector(2 downto 0) := "101";
-   signal pseg1_2    : std_logic_vector(2 downto 0) := "011";   --nominal bit time=sync+prop+pseg1+pseg2=1+6+4+4=15Tqs=1530ns
-   signal pseg2_2    : std_logic_vector(2 downto 0) := "011";
+   --signal prop_seg_2 : std_logic_vector(2 downto 0) := "101";
+   signal tseg1_2    : std_logic_vector(3 downto 0) := "1001";   --nominal bit time=sync+prop+pseg1+pseg2=1+6+4+4=15Tqs=1530ns
+   signal tseg2_2    : std_logic_vector(2 downto 0) := "011";
    signal count_2    : integer range 0 to 50:=0;
 	
  	--Outputs
@@ -78,6 +80,7 @@ ARCHITECTURE behavior OF my_can_btl_tb IS
    signal clock_en_2      : std_logic;
    signal sample_point_2  : std_logic;
    signal sampled_bit_2   : std_logic;
+   signal sampled_bit_2_q   : std_logic;
    signal hard_sync_2     : std_logic;
 	
 	
@@ -87,13 +90,13 @@ ARCHITECTURE behavior OF my_can_btl_tb IS
 		--Inputs
 	signal tx_in_3    : std_logic := '1';
    signal t_3        : std_logic:='0';
-   signal sam_3      : std_logic := '1';
+   signal sam_3      : std_logic := '0';
 	signal clk_3      : std_logic := '0';
    signal sjw_3      : std_logic_vector(1 downto 0) := "11";
    signal brp_3      : std_logic_vector(5 downto 0) := "000100";   -- 1Tq=2*5*clk_period=10*9.8=98 ns;
-   signal prop_seg_3 : std_logic_vector(2 downto 0) := "101";
-   signal pseg1_3    : std_logic_vector(2 downto 0) := "011";   --nominal bit time=sync+prop+pseg1+pseg2=1+6+4+4=15Tqs=1470ns
-   signal pseg2_3    : std_logic_vector(2 downto 0) := "011";
+   --signal prop_seg_3 : std_logic_vector(2 downto 0) := "101";
+   signal tseg1_3    : std_logic_vector(3 downto 0) := "1001";   --nominal bit time=sync+prop+pseg1+pseg2=1+6+4+4=15Tqs=1470ns
+   signal tseg2_3    : std_logic_vector(2 downto 0) := "011";
    signal count_3    : integer range 0 to 50:=0;
 	
  	--Outputs
@@ -101,6 +104,7 @@ ARCHITECTURE behavior OF my_can_btl_tb IS
    signal clock_en_3     : std_logic;
    signal sample_point_3 : std_logic;
    signal sampled_bit_3  : std_logic;
+   signal sampled_bit_3_q  : std_logic;
    signal hard_sync_3    : std_logic;
 
    -- Clock period definitions
@@ -118,62 +122,65 @@ BEGIN
 	-- Instantiate the Unit Under Test (UUT)
    uut: my_can_btl PORT MAP (
           rx => bus_level,
-			    tx_in => tx_in_1,
-			    transmitter=>t_1,
+			 tx_in => tx_in_1,
+			 transmitter=>t_1,
           clk => clk_1,
           rst => rst,
           reset_mode => reset_mode,
           sam => sam_1,
           sjw => sjw_1,
           brp => brp_1,
-          prop_seg => prop_seg_1,
-          pseg1 => pseg1_1,
-          pseg2 => pseg2_1,
-			    tx_out =>tx_out_1,
+          --prop_seg => prop_seg_1,
+          tseg1 => tseg1_1,
+          tseg2 => tseg2_1,
+			 tx_out =>tx_out_1,
           clock_en => clock_en_1,
           sample_point => sample_point_1,
           sampled_bit => sampled_bit_1,
+          sampled_bit_q => sampled_bit_1_q,
           hard_sync => hard_sync_1
         );
 		  
 	  uus: my_can_btl PORT MAP (
           rx => bus_level,
-			    tx_in => tx_in_2,
-			    transmitter=>t_2,
+			 tx_in => tx_in_2,
+			 transmitter=>t_2,
           clk => clk_2,
           rst => rst,
           reset_mode => reset_mode,
           sam => sam_2,
           sjw => sjw_2,
           brp => brp_2,
-          prop_seg => prop_seg_2,
-          pseg1 => pseg1_2,
-          pseg2 => pseg2_2,
-			    tx_out =>tx_out_2,
+          --prop_seg => prop_seg_2,
+          tseg1 => tseg1_2,
+          tseg2 => tseg2_2,
+			 tx_out =>tx_out_2,
           clock_en => clock_en_2,
           sample_point => sample_point_2,
           sampled_bit => sampled_bit_2,
+          sampled_bit_q => sampled_bit_2_q,
           hard_sync => hard_sync_2
         );
 	
       	
 	   uuf: my_can_btl PORT MAP (
           rx => bus_level,
-			    tx_in => tx_in_3,
-			    transmitter=>t_3,
+			 tx_in => tx_in_3,
+			 transmitter=>t_3,
           clk => clk_3,
           rst => rst,
           reset_mode => reset_mode,
           sam => sam_3,
           sjw => sjw_3,
           brp => brp_3,
-          prop_seg => prop_seg_3,
-          pseg1 => pseg1_3,
-          pseg2 => pseg2_3,
-			    tx_out =>tx_out_3,
+          --prop_seg => prop_seg_3,
+          tseg1 => tseg1_3,
+          tseg2 => tseg2_3,
+			 tx_out =>tx_out_3,
           clock_en => clock_en_3,
           sample_point => sample_point_3,
           sampled_bit => sampled_bit_3,
+          sampled_bit_q => sampled_bit_3_q,
           hard_sync => hard_sync_3
         );
 
@@ -183,7 +190,7 @@ BEGIN
    begin
 		clk_1 <= '0';
 		wait for clk_period_1/2;
-		clk_1 <= '1';
+		clk_1 <= '1'; 
 		wait for clk_period_1/2;
    end process;
 	
@@ -204,10 +211,10 @@ BEGIN
 	end process;
   
   
-   rst_process :process(clk_1)
+   rst_process :process(clk_2)
 	variable t: integer range 0 to 1 :=0;
 	begin
-	 if(rising_edge(clk_1)) then
+	 if(rising_edge(clk_2)) then
 	  if(t=0) then
 	   rst <= '1'; 
 	   t:=t+1;
@@ -217,9 +224,9 @@ BEGIN
 	 end if;
 	 end process;
 	 
-   G_count:process(clock_en_1)
+   G_count:process(clock_en_2)
 	 begin
-	 if(rising_edge(clock_en_1)) then
+	 if(rising_edge(clock_en_2)) then
 	  if(cnt>=4000) then
 	   cnt <=0;
 	  else
@@ -231,13 +238,13 @@ BEGIN
 	  
 	 transmit:process(cnt)
 	 begin
-	  if(cnt<=720) then
+	  if(cnt>=2 and cnt<=720) then
 	   t_1 <='1';
 		reset_mode<='0';
-	  elsif(cnt>720 and cnt<=885) then
+	  elsif(cnt>720 and cnt<=880) then
 	   t_1 <='0';
 		reset_mode<='1';
-	  elsif(cnt>885 and cnt<=1600) then
+	  elsif(cnt>880 and cnt<=1600) then
 	   reset_mode<='0';
 		t_2 <='1';
 	  elsif(cnt>1650 and cnt<=1700) then
@@ -313,23 +320,23 @@ BEGIN
 	  tx_in_1 <= '0';
 	 elsif(count_1=4) then 
 	  tx_in_1 <= '1';
-	 elsif(count_1=6) then
+	 elsif(count_1=5) then
 	  tx_in_1 <= '0';
-	 elsif(count_1=9) then
+	 elsif(count_1=8) then
 	  tx_in_1 <= '1';
 	 elsif(count_1=11) then
 	  tx_in_1 <= '0';
-	 elsif(count_1=12) then
+	 elsif(count_1=14) then
 	  tx_in_1 <= '1';
 	 elsif(count_1=15) then
 	  tx_in_1 <= '0';
-	 elsif(count_1=19) then
+	 elsif(count_1=18) then
 	  tx_in_1 <= '1';
 	 elsif(count_1=20) then
 	  tx_in_1 <= '0';
-	 elsif(count_1=21) then
+	 elsif(count_1=23) then
 	  tx_in_1 <= '1';
-	 elsif(count_1=24) then
+	 elsif(count_1=26) then
 	  tx_in_1 <=  '0';
 	 elsif(count_1=28) then
 	  tx_in_1 <=  '1';
