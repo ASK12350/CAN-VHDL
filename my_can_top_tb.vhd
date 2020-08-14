@@ -39,15 +39,17 @@ ARCHITECTURE behavior OF my_can_top_tb IS
     PORT(
          clk : IN  std_logic;
          rst : IN  std_logic;
+			clr : IN  std_logic;
          rx : IN  std_logic;
+			wr : IN std_logic;
+			cs : IN std_logic;
+			addr : IN std_logic_vector(3 DOWNTO 0);
+			data_in : IN std_logic_vector(7 DOWNTO 0);
          tx_in : IN  std_logic;
          transmitter : IN  std_logic;
-			acc_fil : IN std_logic_vector(28 DOWNTO 0);
-         acc_mas : IN std_logic_vector(28 DOWNTO 0);
-			sample_point : out std_logic;
-			sampled_bit : out std_logic;
+			go_error : out std_logic;
 			tx_out : out std_logic;
-			data : OUT std_logic_vector(7 DOWNTO 0)
+			data_out : OUT std_logic_vector(7 DOWNTO 0)
         );
     END COMPONENT;
     
@@ -57,13 +59,17 @@ ARCHITECTURE behavior OF my_can_top_tb IS
    signal rst : std_logic := '0';
    signal tx_in_1 : std_logic := '1';
    signal t_1 : std_logic := '0';
-   SIGNAL acc_fil_1          : std_logic_vector(28 DOWNTO 0):="00000000000000000000000000111";
-   SIGNAL acc_mas_1          : std_logic_vector(28 DOWNTO 0):="11110000000000000000000111111";
-	signal data_1 : std_logic_vector(7 downto 0) ;
+	signal clr_1 : std_logic :='0';
+	signal wr_1 : std_logic :='0';
+	signal cs_1 : std_logic :='0';
+	signal addr_1 : std_logic_vector(3 DOWNTO 0) := "0000";
+	signal data_in_1 : std_logic_vector(7 DOWNTO 0) := (others=>'0');
+	signal data_out_1 : std_logic_vector(7 downto 0) ;
+   signal go_error_1 : std_logic;
 
  	--Outputs
-	signal sampled_bit_1: std_logic;
-	signal sample_point_1 : std_logic;
+	--signal sampled_bit_1: std_logic;
+	--signal sample_point_1 : std_logic;
 	signal tx_out_1 : std_logic;
 	
 	
@@ -71,13 +77,16 @@ ARCHITECTURE behavior OF my_can_top_tb IS
    signal clk_2 : std_logic := '0';
    signal tx_in_2 : std_logic := '1';
    signal t_2 : std_logic := '0';
-	SIGNAL acc_fil_2          : std_logic_vector(28 DOWNTO 0):="11111100000000000000011001100";
-   SIGNAL acc_mas_2          : std_logic_vector(28 DOWNTO 0):="11111100000000000000011111000";
-	signal data_2 : std_logic_vector(7 downto 0) ;
-
+	signal clr_2 : std_logic :='0';
+	signal wr_2 : std_logic :='0';
+	signal cs_2 : std_logic :='0';
+	signal addr_2 : std_logic_vector(3 DOWNTO 0) := "0000";
+	signal data_in_2 : std_logic_vector(7 DOWNTO 0) := (others=>'0');
+	signal data_out_2 : std_logic_vector(7 downto 0) ;
+   signal go_error_2 : std_logic;
  	--Outputs
-	signal sampled_bit_2: std_logic;
-	signal sample_point_2 : std_logic;
+	--signal sampled_bit_2: std_logic;
+	--signal sample_point_2 : std_logic;
 	signal tx_out_2 : std_logic;
 
 	
@@ -86,13 +95,16 @@ ARCHITECTURE behavior OF my_can_top_tb IS
    signal clk_3 : std_logic := '0';
    signal tx_in_3 : std_logic := '1';
    signal t_3 : std_logic := '0';
-	SIGNAL acc_fil_3          : std_logic_vector(28 DOWNTO 0):="01000101011010001000110100101";
-   SIGNAL acc_mas_3          : std_logic_vector(28 DOWNTO 0):="00000000000000000010000000000";
-   signal data_3 : std_logic_vector(7 downto 0) ;
-
+	signal clr_3 : std_logic :='0';
+	signal wr_3 : std_logic :='0';
+	signal cs_3 : std_logic :='0';
+	signal addr_3 : std_logic_vector(3 DOWNTO 0) := "0000";
+	signal data_in_3 : std_logic_vector(7 DOWNTO 0) := (others=>'0');
+   signal data_out_3 : std_logic_vector(7 downto 0) ;
+   signal go_error_3 : std_logic;
  	--Outputs
-	signal sampled_bit_3 : std_logic;
-	signal sample_point_3 : std_logic;
+	--signal sampled_bit_3 : std_logic;
+	--signal sample_point_3 : std_logic;
   	signal tx_out_3 : std_logic;
 
   
@@ -113,41 +125,47 @@ BEGIN
    uut: my_can_top PORT MAP (
           clk => clk_1,
           rst => rst,
+			 clr=>clr_1,
           rx => bus_level,
           tx_in => tx_in_1,
           transmitter => t_1,
-			 acc_fil=>acc_fil_1,
-			 acc_mas=>acc_mas_1,
-			 sample_point=>sample_point_1,
-			 sampled_bit=>sampled_bit_1,
-          tx_out => tx_out_1,
-			 data=>data_1
+			 wr =>wr_1,
+			 cs =>cs_1,
+			 addr=>addr_1,
+			 data_in=>data_in_1,
+			 data_out=>data_out_1,
+			 go_error=>go_error_1,
+          tx_out => tx_out_1
         );
 	 uus: my_can_top PORT MAP (
           clk => clk_2,
           rst => rst,
+			 clr =>clr_2,
           rx => bus_level,
           tx_in => tx_in_2,
           transmitter => t_2,
-			 acc_fil=>acc_fil_2,
-			 acc_mas=>acc_mas_2,
-			 sample_point=>sample_point_2,
-			 sampled_bit=>sampled_bit_2,
-          tx_out => tx_out_2,
-			 data=>data_2
+			 wr =>wr_2,
+			 cs =>cs_2,
+			 addr=>addr_2,
+			 data_in=>data_in_2,
+			 data_out=>data_out_2,
+			 go_error=>go_error_2,
+          tx_out => tx_out_2
         );
 	uuf: my_can_top PORT MAP (
           clk => clk_3,
           rst => rst,
+			 clr =>clr_3,
           rx => bus_level,
           tx_in => tx_in_3,
           transmitter => t_3,
-			 acc_fil=>acc_fil_3,
-			 acc_mas=>acc_mas_3,
-			 sample_point=>sample_point_3,
-			 sampled_bit=>sampled_bit_3,
-          tx_out => tx_out_3,
-			 data=>data_3
+			 wr =>wr_3,
+			 cs =>cs_3,
+			 addr=>addr_3,
+			 data_in=>data_in_3,
+			 data_out=>data_out_3,
+			 go_error=>go_error_3,
+          tx_out => tx_out_3
         );
 
 
@@ -178,7 +196,159 @@ BEGIN
    end process;
  
 
-   -- Stimulus process
+   clr_proc :process
+	begin
+	  clr_1 <='1';
+	  clr_2 <='1';
+	  clr_3 <='1';
+	  wait for 500 ns;
+	  clr_1 <='0';
+	  clr_2 <='0';
+	  clr_3 <='0';
+	  wait ;
+   end process;
+	
+	cs:process
+	begin
+	 cs_1 <='0';
+	 cs_2 <='0';
+	 cs_3 <='0';
+	 wait for 570 ns;
+	 cs_1 <='1';
+	 cs_2 <='1';
+	 cs_3 <='1';
+	 wait for 280 ns;
+	 cs_1 <='0';
+	 cs_2 <='0';
+	 cs_3 <='0';
+	 wait;
+	end process;
+	
+	wr:process
+	begin
+	  wr_1 <='0';
+	  wr_2 <='0';
+	  wr_3 <='0';
+	  wait for 600 ns;
+	  wr_1 <='1';
+	  wr_2 <='1';
+	  wr_3 <='1';
+	  wait for 240 ns;
+	  wr_1 <='0';
+	  wr_2 <='0';
+	  wr_3 <='0';
+	  wait;
+	end process;
+	
+	data:process
+	begin
+	  data_in_1 <=(others=>'0');
+	  data_in_2 <=(others=>'0');
+	  data_in_3 <=(others=>'0');
+	 wait for 615 ns;
+	  data_in_1 <="11000011";              -- sjw = data(7 downto 6):="11"
+	  data_in_2 <="11000011";              -- brp = data(5 DOWNTO 0):= "000011"
+	  data_in_3 <="11000011";
+    wait for 20 ns; 	 
+     data_in_1 <="10111000";              -- sam   = data(7)
+     data_in_2 <="00111000";              -- tseg2 = data(6 DOWNTO 4)="011"
+     data_in_3 <="10111000";              -- tseg1 = data(3 DOWNTO 0)="1000"
+	 wait for 20 ns;
+	  data_in_1 <="11110000";              --acc_mask_0 = "11110000"
+	  data_in_2 <="11111100";              --acc_mask_0 = "11111100"
+	  data_in_3 <="00000000";              --acc_mask_0 = "00000000"
+	 wait for 20 ns;
+	  data_in_1 <="00000000";              --acc_mask_1 = "00000000"
+	  data_in_2 <="00000000";              --acc_mask_1 = "00000000"         
+	  data_in_3 <="00000000";              --acc_mask_1 = "00000000"
+	 wait for 20 ns;
+	  data_in_1 <="00000001";              --acc_mask_2 = "00000001"
+	  data_in_2 <="00000111";              --acc_mask_2 = "00000111"         
+	  data_in_3 <="00100000";              --acc_mask_2 = "00100000"
+	 wait for 20 ns;
+	  data_in_1 <="00011111";              --acc_mask_3 = "00011111"
+	  data_in_2 <="00011000";              --acc_mask_3 = "00011000"         
+	  data_in_3 <="00000000";              --acc_mask_3 = "00000000"
+	 wait for 20 ns;
+	  data_in_1 <="00000000";              --acc_filt_0 = "00000000"
+	  data_in_2 <="11111100";              --acc_filt_0 = "11111100"         
+	  data_in_3 <="01000101";              --acc_filt_0 = "01000101"
+	 wait for 20 ns;
+	  data_in_1 <="00000000";              --acc_filt_1 = "00000000"
+	  data_in_2 <="00000000";              --acc_filt_1 = "00000000"         
+	  data_in_3 <="01101000";              --acc_filt_1 = "01101000"
+	 wait for 20 ns;
+	  data_in_1 <="00000000";              --acc_filt_2 = "00000000"
+	  data_in_2 <="00000110";              --acc_filt_2 = "00000110"         
+	  data_in_3 <="10001101";              --acc_filt_2 = "10001101"
+	 wait for 20 ns;
+	  data_in_1 <="00000111";              --acc_filt_3 = "00000111"
+	  data_in_2 <="00001100";              --acc_filt_3 = "00001100"         
+	  data_in_3 <="00000101";              --acc_filt_3 = "00000101"
+	 wait for 20 ns;
+	  data_in_1 <=(others=>'0');
+	  data_in_2 <=(others=>'0');
+	  data_in_3 <=(others=>'0');
+	 wait;
+	end process;
+	
+	addr:process
+	begin
+	 addr_1 <=(others=>'0');
+	 addr_2 <=(others=>'0');
+	 addr_3 <=(others=>'0');
+	wait for 615 ns;
+	 addr_1 <="0001";
+	 addr_2 <="0001";
+	 addr_3 <="0001";
+	wait for 20 ns;
+	 addr_1 <="0010";
+	 addr_2 <="0010";
+	 addr_3 <="0010";
+	wait for 20 ns;
+	 addr_1 <="0011";
+	 addr_2 <="0011";
+	 addr_3 <="0011";
+	wait for 20 ns;
+	 addr_1 <="0100";
+	 addr_2 <="0100";
+	 addr_3 <="0100";
+	wait for 20 ns;
+	 addr_1 <="0101";
+	 addr_2 <="0101";
+	 addr_3 <="0101";
+	wait for 20 ns;
+	 addr_1 <="0110";
+	 addr_2 <="0110";
+	 addr_3 <="0110";
+	wait for 20 ns;
+	 addr_1 <="0111";
+	 addr_2 <="0111";
+	 addr_3 <="0111";
+	wait for 20 ns;
+	 addr_1 <="1000";
+	 addr_2 <="1000";
+	 addr_3 <="1000";
+	wait for 20 ns;
+	 addr_1 <="1001";
+	 addr_2 <="1001";
+	 addr_3 <="1001";
+	wait for 20 ns;
+	 addr_1 <="1010";
+	 addr_2 <="1010";
+	 addr_3 <="1010";
+	wait for 20 ns;
+	 addr_1 <="1011";
+	 addr_2 <="1011";
+	 addr_3 <="1011";
+	wait for 20 ns;
+	 addr_1 <=(others=>'0');
+	 addr_2 <=(others=>'0');
+	 addr_3 <=(others=>'0');
+	wait;
+  end process;
+  
+	-- Stimulus process
    rst_proc: process
    begin		
       rst <='1';-- hold reset state for 100 ns.
@@ -211,12 +381,12 @@ BEGIN
 	 
 	 tx:process
 	 begin
-	 tx_in_1 <='1';
-	 wait for 1500 ns;
-	  tx_in_1<='0';
-    wait for 1100 ns;   --sof end
-	   tx_in_1 <='0';    --ID1 start
-	 wait for 1100 ns;    
+	   tx_in_1 <='1';
+	   wait for 1500 ns;
+	    tx_in_1<='0';
+      wait for 1100 ns;   --sof end
+	    tx_in_1 <='0';    --ID1 start
+	   wait for 1100 ns;    
        tx_in_1<='1';
       wait for 4400 ns;
        tx_in_1<='0';
@@ -245,30 +415,28 @@ BEGIN
 		wait for 5500 ns; --rb1 & rb0 & dlc(3 downto 1)          --RB1=RB0=0
 		 tx_in_1 <='1';   --destuffs
 		wait for 1100 ns;
-       tx_in_1 <='0';
-      wait for 1100 ns; --dlc(4)                               --dlc=0000 
-       tx_in_1 <='1';   --crc starts
-      wait for 1100 ns;                      --crc calculated is 101100001000110
-        tx_in_1 <='0';
-      wait for 1100 ns;
        tx_in_1 <='1';
-      wait for 2200 ns;
-       tx_in_1 <='0';
-      wait for 4400 ns;
-       tx_in_1 <='1';
-      wait for 1100 ns;
-       tx_in_1 <='0';
+      wait for 1100 ns; --dlc(0)                               --dlc=0001 
+       tx_in_1 <='0';   --crc starts
+      wait for 2200 ns;                      --crc calculated is 001110111011111
+        tx_in_1 <='1';
       wait for 3300 ns;
-       tx_in_1 <='1';
-      wait for 2200 ns;
        tx_in_1 <='0';
-		wait for 1100 ns; --crc ends          --crc received is 101100001000110
+      wait for 1100 ns;
+       tx_in_1 <='1';
+      wait for 3300 ns;
+       tx_in_1 <='0';
+      wait for 1100 ns;
+       tx_in_1 <='1';
+      wait for 5500 ns; --crc ends            --crc received is 001110111011111
+		 tx_in_1 <='0';
+		wait for 1100 ns;
 		 tx_in_1 <='1';
       wait for 30000 ns; --crc_de,ack,ack_de,etc		 
-      tx_in_2 <='1';
-	 wait for 1500 ns;
-	  tx_in_2<='0';       --sof
-    wait for 1100 ns;    
+       tx_in_2 <='1';
+	   wait for 1500 ns;
+	    tx_in_2<='0';       --sof
+      wait for 1100 ns;    
        tx_in_2<='1';     --ID1 starts
       wait for 1100 ns; 
        tx_in_2<='0';
@@ -282,45 +450,33 @@ BEGIN
        tx_in_2<='0';
       wait for 2200 ns;
        tx_in_2<='1'; 
-		wait for 1100 ns;  --ID1 ends                          ID1:-10011001001
+		wait for 2200 ns;  --ID1 ends , rtr=1                        ID1:-10011001001
 		 tx_in_2<='0';
-		wait for 5500 ns; --rtr,ide,rn0 ,dlc(3 downto 2)       rtr=ide=rb0=0
+		wait for 5500 ns; --ide,rn0 ,dlc(3 downto 1)       rtr=1,ide=rb0=0                             
 		 tx_in_2 <='1';
-		wait for 1100 ns; --destuffs                             
+		wait for 1100 ns; --destuffs
+		tx_in_2 <='1';   --   dlc(0)                       dlc==0001
+		wait for 1100 ns;
+		 tx_in_2 <='0';    --crc starts      		 crc calculated is 001111100000110
+		wait for 2200 ns; 
+		 tx_in_2 <='1';
+		wait for 5500 ns;
 		 tx_in_2 <='0';
-		wait for 2200 ns; --dlc(1 downto 0)                    dlc=0000
-		 tx_in_2 <='0';   --crc starts            crc calculated is 010100101011010
-		wait for 1100 ns; 
+		wait for 5500 ns;
 		 tx_in_2 <='1';
-		wait for 1100 ns;
-		 tx_in_2 <='0';
-		wait for 1100 ns;
-		 tx_in_2 <='1';
-		wait for 1100 ns;
+		wait for 1100 ns; --destuffs
        tx_in_2 <='0';
-      wait for 2200 ns;
-       tx_in_2 <='1';
       wait for 1100 ns;
-       tx_in_2 <='0';
-		wait for 1100 ns;
-       tx_in_2 <='1';
-      wait for 1100 ns;
-       tx_in_2 <='0';
-		wait for 1100 ns;
        tx_in_2 <='1';
       wait for 2200 ns;
        tx_in_2 <='0';
-		wait for 1100 ns;
-       tx_in_2 <='1';
-      wait for 1100 ns;
-       tx_in_2 <='0';
-		wait for 1100 ns; --crc ends               crc receivec is 010100101011010
+		wait for 1100 ns; --crc ends                crc received is 001111100000110
 		 tx_in_2 <='1';
       wait for 12300 ns; --crc_de,ack,ack_de etc
 		 tx_in_3 <='1';
 		wait for 11000 ns;
       tx_in_3<='0';
-    wait for 2200 ns; --sof ,id(10)
+      wait for 2200 ns; --sof ,id(10)
        tx_in_3<='1';
       wait for 1100 ns; 
        tx_in_3<='0';
@@ -364,7 +520,7 @@ BEGIN
 		 tx_in_1 <='0';
 		wait for 2200 ns;  --sof,id(10) 
 		 tx_in_1 <='1';
-		wait for 3300 ns;  --
+		wait for 3300 ns;  
 		 tx_in_1 <='0';
 		wait for 1100 ns;
 		 tx_in_1 <='1';
@@ -479,7 +635,7 @@ BEGIN
 		wait for 1100 ns;
 		 tx_in_1 <='1';
 		wait for 5500 ns;
-		 tx_in_1 <='1';  --changed
+		 tx_in_1 <='0';   --change to check stuff error
 		wait for 1100 ns; --destuffs
 		 tx_in_1 <='1';
 		wait for 2200 ns;

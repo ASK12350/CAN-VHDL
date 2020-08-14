@@ -18,7 +18,6 @@ ENTITY my_can_btl IS
 	     tseg2           : IN std_logic_vector(2 DOWNTO 0);
 		         sampled_bit_q     : OUT std_logic;
 		         tx_out            : OUT std_logic;
-		         clock_en          : OUT std_logic;
 		         sample_point      : OUT std_logic;
 					sampled_bit       : OUT std_logic;
 					hard_sync         : OUT std_logic); 
@@ -64,7 +63,6 @@ go_tseg2 <=clk_en and rx_tseg1 and conv(cnt2=to_integer(unsigned(tseg1))+delayl)
 sampled_bit <=sampled_bit_temp;
 hard_sync <= hard_sync_temp;
 rx_edge <= NOT(rx_q) AND rx_q_q ;
-clock_en <=clk_en;
 tx_out <=tx_in or (not(transmitter));
  
 PROCESS(clk)

@@ -21,15 +21,14 @@ ARCHITECTURE behavior OF my_can_btl_tb IS
          sam          : IN  std_logic;
          sjw          : IN  std_logic_vector(1 downto 0);
          brp          : IN  std_logic_vector(5 downto 0);
-         --prop_seg     : IN  std_logic_vector(2 downto 0);
-         tseg1        : IN  std_logic_vector(3 downto 0);
-         tseg2        : IN  std_logic_vector(2 downto 0);
-			    sampled_bit_q : OUT  std_logic;
-			    tx_out        : OUT  std_logic;
-             clock_en      : OUT  std_logic;
-             sample_point  : OUT  std_logic;
-             sampled_bit   : OUT  std_logic;
-             hard_sync     : OUT  std_logic
+         prop_seg     : IN  std_logic_vector(2 downto 0);
+         pseg1        : IN  std_logic_vector(2 downto 0);
+         pseg2        : IN  std_logic_vector(2 downto 0);
+			    tx_out       : OUT  std_logic;
+             clock_en     : OUT  std_logic;
+             sample_point : OUT  std_logic;
+             sampled_bit  : OUT  std_logic;
+             hard_sync    : OUT  std_logic
         );
     END COMPONENT;
     
@@ -46,9 +45,9 @@ ARCHITECTURE behavior OF my_can_btl_tb IS
    signal sam_1       : std_logic := '0';
    signal sjw_1       : std_logic_vector(1 downto 0) := "11";
    signal brp_1       : std_logic_vector(5 downto 0) := "000100";   -- 1Tq=2*5*clk_period=2*5*10=100 ns;
-  -- signal prop_seg_1  : std_logic_vector(2 downto 0) := "101";
-   signal tseg1_1     : std_logic_vector(3 downto 0) := "1001";   --nominal bit time=sync+tseg1+pseg2=1+10+4=15Tqs=1500ns
-   signal tseg2_1     : std_logic_vector(2 downto 0) := "011";
+   signal prop_seg_1  : std_logic_vector(2 downto 0) := "101";
+   signal pseg1_1     : std_logic_vector(2 downto 0) := "011";   --nominal bit time=sync+prop+pseg1+pseg2=1+6+4+4=15Tqs=1500ns
+   signal pseg2_1     : std_logic_vector(2 downto 0) := "011";
 	signal count_1     : integer range 0 to 50:=0;
 	signal cnt         : integer range 0 to 4000:=0;
 
@@ -57,7 +56,6 @@ ARCHITECTURE behavior OF my_can_btl_tb IS
    signal clock_en_1     : std_logic;
    signal sample_point_1 : std_logic;
    signal sampled_bit_1  : std_logic;
-   signal sampled_bit_1_q  : std_logic;
    signal hard_sync_1    : std_logic;
 	
 	
@@ -70,9 +68,9 @@ ARCHITECTURE behavior OF my_can_btl_tb IS
    signal sam_2      : std_logic := '1';
    signal sjw_2      : std_logic_vector(1 downto 0) := "11";
    signal brp_2      : std_logic_vector(5 downto 0) := "000100";   -- 1Tq=2*clk_period=2*5*10.2=102 ns;
-   --signal prop_seg_2 : std_logic_vector(2 downto 0) := "101";
-   signal tseg1_2    : std_logic_vector(3 downto 0) := "1001";   --nominal bit time=sync+prop+pseg1+pseg2=1+6+4+4=15Tqs=1530ns
-   signal tseg2_2    : std_logic_vector(2 downto 0) := "011";
+   signal prop_seg_2 : std_logic_vector(2 downto 0) := "101";
+   signal pseg1_2    : std_logic_vector(2 downto 0) := "011";   --nominal bit time=sync+prop+pseg1+pseg2=1+6+4+4=15Tqs=1530ns
+   signal pseg2_2    : std_logic_vector(2 downto 0) := "011";
    signal count_2    : integer range 0 to 50:=0;
 	
  	--Outputs
@@ -80,7 +78,6 @@ ARCHITECTURE behavior OF my_can_btl_tb IS
    signal clock_en_2      : std_logic;
    signal sample_point_2  : std_logic;
    signal sampled_bit_2   : std_logic;
-   signal sampled_bit_2_q   : std_logic;
    signal hard_sync_2     : std_logic;
 	
 	
@@ -94,9 +91,9 @@ ARCHITECTURE behavior OF my_can_btl_tb IS
 	signal clk_3      : std_logic := '0';
    signal sjw_3      : std_logic_vector(1 downto 0) := "11";
    signal brp_3      : std_logic_vector(5 downto 0) := "000100";   -- 1Tq=2*5*clk_period=10*9.8=98 ns;
-   --signal prop_seg_3 : std_logic_vector(2 downto 0) := "101";
-   signal tseg1_3    : std_logic_vector(3 downto 0) := "1001";   --nominal bit time=sync+prop+pseg1+pseg2=1+6+4+4=15Tqs=1470ns
-   signal tseg2_3    : std_logic_vector(2 downto 0) := "011";
+   signal prop_seg_3 : std_logic_vector(2 downto 0) := "101";
+   signal pseg1_3    : std_logic_vector(2 downto 0) := "011";   --nominal bit time=sync+prop+pseg1+pseg2=1+6+4+4=15Tqs=1470ns
+   signal pseg2_3    : std_logic_vector(2 downto 0) := "011";
    signal count_3    : integer range 0 to 50:=0;
 	
  	--Outputs
@@ -104,7 +101,6 @@ ARCHITECTURE behavior OF my_can_btl_tb IS
    signal clock_en_3     : std_logic;
    signal sample_point_3 : std_logic;
    signal sampled_bit_3  : std_logic;
-   signal sampled_bit_3_q  : std_logic;
    signal hard_sync_3    : std_logic;
 
    -- Clock period definitions
@@ -130,14 +126,13 @@ BEGIN
           sam => sam_1,
           sjw => sjw_1,
           brp => brp_1,
-          --prop_seg => prop_seg_1,
-          tseg1 => tseg1_1,
-          tseg2 => tseg2_1,
+          prop_seg => prop_seg_1,
+          pseg1 => pseg1_1,
+          pseg2 => pseg2_1,
 			 tx_out =>tx_out_1,
           clock_en => clock_en_1,
           sample_point => sample_point_1,
           sampled_bit => sampled_bit_1,
-          sampled_bit_q => sampled_bit_1_q,
           hard_sync => hard_sync_1
         );
 		  
@@ -151,14 +146,13 @@ BEGIN
           sam => sam_2,
           sjw => sjw_2,
           brp => brp_2,
-          --prop_seg => prop_seg_2,
-          tseg1 => tseg1_2,
-          tseg2 => tseg2_2,
+          prop_seg => prop_seg_2,
+          pseg1 => pseg1_2,
+          pseg2 => pseg2_2,
 			 tx_out =>tx_out_2,
           clock_en => clock_en_2,
           sample_point => sample_point_2,
           sampled_bit => sampled_bit_2,
-          sampled_bit_q => sampled_bit_2_q,
           hard_sync => hard_sync_2
         );
 	
@@ -173,14 +167,13 @@ BEGIN
           sam => sam_3,
           sjw => sjw_3,
           brp => brp_3,
-          --prop_seg => prop_seg_3,
-          tseg1 => tseg1_3,
-          tseg2 => tseg2_3,
+          prop_seg => prop_seg_3,
+          pseg1 => pseg1_3,
+          pseg2 => pseg2_3,
 			 tx_out =>tx_out_3,
           clock_en => clock_en_3,
           sample_point => sample_point_3,
           sampled_bit => sampled_bit_3,
-          sampled_bit_q => sampled_bit_3_q,
           hard_sync => hard_sync_3
         );
 
@@ -190,7 +183,7 @@ BEGIN
    begin
 		clk_1 <= '0';
 		wait for clk_period_1/2;
-		clk_1 <= '1'; 
+		clk_1 <= '1';
 		wait for clk_period_1/2;
    end process;
 	
@@ -381,9 +374,9 @@ BEGIN
 	  tx_in_2 <= '1';
 	 elsif(count_2=23) then
 	  tx_in_2 <=  '0';
-	 elsif(count_2=26) then
+	 elsif(count_2=25) then
 	  tx_in_2 <=  '1';
-	 elsif(count_2=30) then
+	 elsif(count_2=28) then
 	  tx_in_2 <= '0';
 	 elsif(count_2=33) then
 	  tx_in_2 <= '1';
@@ -391,7 +384,7 @@ BEGIN
 	  tx_in_2 <= '0';
 	 elsif(count_2=42) then
 	  tx_in_2 <= '1';
-	 elsif(count_2=44) then
+	 elsif(count_2=45) then
 	  tx_in_2 <= '0';
 	 elsif(count_2=47) then
 	  tx_in_2 <= '1';

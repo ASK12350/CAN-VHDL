@@ -7,7 +7,6 @@ ENTITY my_can_bsp IS
     PORT(
 	     clk          : IN std_logic;
 		  rst          : IN std_logic;
-		  clk_en       : IN std_logic;
 		  hard_sync    : IN std_logic;
 		  sample_point : IN std_logic;
 		  sampled_bit  : IN std_logic;
@@ -15,6 +14,7 @@ ENTITY my_can_bsp IS
 		  id_ok        : IN std_logic;
 		    ide_out    : OUT std_logic;
 			 acf_en     : OUT std_logic;
+			 go_error   : OUT std_logic;
 			 id         : OUT std_logic_vector(28 DOWNTO 0) ;
 		    reset_mode : OUT std_logic;
 		       data_out    : OUT std_logic_vector(7 DOWNTO 0));
@@ -49,7 +49,6 @@ SIGNAL go_rx_ack_de : std_logic;
 SIGNAL go_rx_eof    : std_logic;
 SIGNAL go_rx_idle   : std_logic;
 SIGNAL go_rx_inter  : std_logic;
-SIGNAL go_rx_error  : std_logic;
 SIGNAL go_rx_presof : std_logic;
 SIGNAL go_rx_sof    : std_logic;
 
@@ -61,7 +60,6 @@ SIGNAL go_form_error  : std_logic;
 --rx_state
 SIGNAl rx_idle      : std_logic;
 SIGNAL rx_inter     : std_logic;
-SIGNAL rx_error     : std_logic;
 SIGNAL rx_presof    : std_logic;
 SIGNAL rx_sof       : std_logic;
 SIGNAL rx_id1       : std_logic;
@@ -82,12 +80,12 @@ SIGNAL rx_eof       : std_logic;
 --state values
 SIGNAL id1          : std_logic_vector(10 DOWNTO 0);
 SIGNAL id2          : std_logic_vector(17 DOWNTO 0);
-SIGNAL rtr1         : std_logic;
+SIGNAL rtr1         : std_logic;                      --srr in case of extended frame
 SIGNAL ide          : std_logic;
-SIGNAL rtr2         : std_logic;
-SIGNAL rb0          : std_logic;
+SIGNAL rtr2         : std_logic;                      --rtr in case of extended frame
+SIGNAL rb0          : std_logic;                      
 SIGNAL rb1          : std_logic;
-SIGNAL dlc          : std_logic_vector(3 DOWNTO 0);
+SIGNAL dlc          : std_logic_vector(3 DOWNTO 0):=(others=>'0');
 SIGNAL data_temp    : std_logic_vector(7 DOWNTO 0);
 SIGNAL crc          : std_logic_vector(14 DOWNTO 0);
 SIGNAL crc_de       : std_logic;
@@ -117,31 +115,18 @@ SIGNAL crc_temp      : std_logic_vector(14 DOWNTO 0);
 --fifo
 SIGNAL wr_fifo      : std_logic;
 SIGNAL cs_fifo      : std_logic;
-SIGNAL wr_cnt       : integer ;
+SIGNAL wr_cnt       : integer range 0 TO 7 ;
 
---SIGNAL sample_point_q : std_logic;
+SIGNAL remote_frame    : std_logic;
 
 FUNCTION conv(b: boolean) return std_logic IS
 BEGIN
   IF b THEN
    return('1');
-  ELSE
+  ELSE                                               --boolean to std_logic
    return ('0'); 
   END IF;
 END ;
-
-FUNCTION orv(s:std_logic_vector(3 DOWNTO 0)) return std_logic IS
-VARIABLE temp : std_logic:='0';
-BEGIN 
-  FOR i IN 0 TO 2 LOOP
-   temp:=temp or s(i);
-  END LOOP;
-  IF(temp='1') THEN                  --IF std_log_vector="000" then return '0' else '1';
-   return ('1'); 
-  ELSE
-   return ('0');
-  END IF;
-END;
 
 BEGIN
 
@@ -151,31 +136,28 @@ uucrc : my_can_crc PORT MAP    (    clk=>clk,
 							               data=>sampled_bit_q,
 							            	crc_out=>crc_temp   );
 
+
 ide_out <=ide;
+
 --crc signals
 crc_enable <= crc_en and sample_point and not(destuff);
 crc_clr    <= rst or rx_idle;
-
-destuff_en <= not(rx_idle or rx_inter or rx_eof or rx_ack or rx_crc_de or rx_ack_de or rx_presof);
-
-dlc_int    <= 63 WHEN dlc(3)='1' ELSE
-              to_integer(8*unsigned(dlc))-1;
  
 --go_rx_signals 
 go_rx_presof   <= hard_sync and (rx_idle or rx_inter);
 go_rx_sof      <= (sample_point and rx_presof);
 go_rx_id1      <= (sample_point and rx_sof);
-go_rx_rtr1     <= (sample_point and rx_id1 and not(destuff))and conv(cnt=10);
-go_rx_ide      <= (sample_point and rx_rtr1 and not(destuff));
-go_rx_id2      <= (sample_point and rx_ide) and sampled_bit_q and not(destuff);
-go_rx_rtr2     <= (sample_point and rx_id2) and not(destuff) and conv(cnt=17);
-go_rx_rb0      <=  sample_point and ((not(sampled_bit_q) and rx_ide) or (ide and rx_rb1));
-go_rx_rb1      <= (sample_point and rx_rtr2 and ide) and not(destuff); 
-go_rx_dlc      <= (sample_point and rx_rb0) and not(destuff);
-go_rx_data     <= (sample_point and not(destuff)) and (conv(cnt=3)  and rx_dlc and (orv(dlc) or sampled_bit_q));
-go_rx_crc      <= ((sample_point and ((rx_data and conv(cnt=dlc_int)) or (rx_dlc and conv(cnt=3) and not(orv(dlc) or sampled_bit_q)))) and not(destuff)) ;
-go_rx_crc_de   <= (sample_point and rx_crc) and conv(cnt=14) and not(destuff);
-go_rx_ack      <= (sample_point and rx_crc_de);
+go_rx_rtr1     <= (sample_point and not(destuff)) and conv(cnt=10) and rx_id1;
+go_rx_ide      <= (sample_point and not(destuff)) and rx_rtr1;
+go_rx_id2      <= (sample_point and not(destuff)) and sampled_bit_q and rx_ide;
+go_rx_rtr2     <= (sample_point and not(destuff)) and conv(cnt=17) and rx_id2;
+go_rx_rb0      <= (sample_point and not(destuff)) and ((not(sampled_bit_q) and rx_ide) or (ide and rx_rb1));
+go_rx_rb1      <= (sample_point and not(destuff)) and rx_rtr2 and ide; 
+go_rx_dlc      <= (sample_point and not(destuff)) and rx_rb0;
+go_rx_data     <= (sample_point and not(destuff)) and conv(cnt=3) and rx_dlc and not(remote_frame);
+go_rx_crc      <= (sample_point and not(destuff)) and ((rx_data and conv(cnt=dlc_int)) or (rx_dlc and conv(cnt=3) and remote_frame)) ;
+go_rx_crc_de   <= (sample_point and not(destuff)) and conv(cnt=14) and rx_crc;
+go_rx_ack      <= (sample_point and not(destuff)) and rx_crc_de;
 go_rx_ack_de   <= (sample_point and rx_ack);
 go_rx_eof      <= (sample_point and rx_ack_de);
 go_rx_inter    <= (sample_point and rx_eof) and conv(cnt=6);
@@ -184,7 +166,15 @@ go_rx_idle     <= (sample_point and rx_inter) and conv(cnt=2);
 --go_error signals
 go_crc_error   <= go_rx_eof and not(conv(crc=crc_temp));
 go_stuff_error <= sample_point and conv(destuff_cnt=4) and (sampled_bit xnor sampled_bit_q) and destuff_en ;
-go_form_error <=  sample_point and  (ack_de or crc_de or rx_eof) and not(sampled_bit_q);
+go_form_error <=  sample_point and not(destuff) and (rx_ack_de or rx_crc_de or rx_eof) and not(sampled_bit_q);
+go_error <=go_form_error or go_stuff_error or go_crc_error;
+
+remote_frame    <= ((not(ide) and rtr1) or (ide and rtr2));
+
+destuff_en      <= not(rx_idle or rx_inter or rx_eof or rx_ack or rx_crc_de or rx_ack_de or rx_presof);
+
+dlc_int         <= 63 WHEN dlc(3)='1' ELSE
+                   to_integer(8*unsigned(dlc))-1;
 
 --data into a temporary storage
 PROCESS(clk,rst)
@@ -200,6 +190,7 @@ BEGIN
   END IF;
 END PROCESS;
 
+--data counter
 PROCESS(clk,rst)
 BEGIN
   IF(rst='1') THEN
@@ -213,7 +204,7 @@ BEGIN
   END IF;
 END PROCESS;
 
-
+--wr signal to store data in temp storage
 PROCESS(clk,rst)
 BEGIN
   IF(rst='1') THEN
@@ -229,7 +220,7 @@ BEGIN
   END IF;
 END PROCESS;
 	   
---count 
+--counting 
 PROCESS(clk,rst)
 BEGIN
   IF(rst='1') THEN
@@ -515,6 +506,7 @@ BEGIN
 END PROCESS;
 
 --values to be stored or compared
+
 --standard ID
 PROCESS(clk,rst) 
 BEGIN
@@ -661,7 +653,7 @@ BEGIN
   IF(rst='1') THEN
    crc_de <= '1';
   ELSIF(rising_edge(clk)) THEN
-    IF((rx_crc_de and sample_point)='1') THEN
+    IF((rx_crc_de and sample_point and not(destuff))='1') THEN
      crc_de <= sampled_bit_q;
     ELSIF(rx_idle='1') THEN
 	  crc_de <='1';
@@ -777,40 +769,42 @@ BEGIN
   END IF;
 END PROCESS;
 
---write to fifo
+--cs for fifo
 PROCESS(clk,rst)
 BEGIN
   IF(rst='1') THEN
    cs_fifo <='0';
   ELSIF(rising_edge(clk)) THEN
-    IF((go_rx_inter and id_ok)='1') THEN
+    IF((go_rx_inter and id_ok and not(remote_frame))='1') THEN
 	  cs_fifo <='1';
-	 ELSIF(wr_cnt=to_integer(unsigned(dlc))) THEN
+	 ELSIF(wr_cnt+1=to_integer(unsigned(dlc))) THEN
 	  cs_fifo <='0';
 	 END IF;
   END IF;
 END PROCESS;
 
+--write signal for fifo
 PROCESS(clk,rst)
 BEGIN
   IF(rst='1') THEN
    wr_fifo <='0';
   ELSIF(rising_edge(clk)) THEN
-    IF((go_rx_inter and id_ok)='1') THEN
+    IF((go_rx_inter and id_ok and not(remote_frame))='1') THEN
 	  wr_fifo <='1';
-	 ELSIF(wr_cnt=to_integer(unsigned(dlc))) THEN
+	 ELSIF(wr_cnt+1=to_integer(unsigned(dlc))) THEN
 	  wr_fifo <='0';
 	 END IF;
   END IF;
 END PROCESS;
 
+--data counting for fifo
 PROCESS(clk,rst)
 BEGIN
   IF(rst='1') THEN
    wr_cnt <=0;
   ELSIF(rising_edge(clk)) THEN
-    IF((cs_fifo and wr_fifo)='1') THEN
-	   IF(wr_cnt=to_integer(unsigned(dlc))) THEN
+    IF((cs_fifo and wr_fifo and not(remote_frame))='1') THEN
+	   IF(wr_cnt+1=to_integer(unsigned(dlc))) THEN
 		 wr_cnt <=0;
 		ELSE
 		 wr_cnt <=wr_cnt+1;
@@ -819,13 +813,16 @@ BEGIN
   END IF;
 END PROCESS;
 
+--data sent into fifo 
 PROCESS(clk,rst)
 BEGIN
   IF(rst='1') THEN
    data_out <= (others=>'0') ;
   ELSIF(rising_edge(clk)) THEN 
-    IF((cs_fifo and wr_fifo)='1') THEN
+    IF((cs_fifo and wr_fifo and not(remote_frame))='1') THEN
 	  data_out <=data_fifo(wr_cnt);
+	 ELSE
+	  data_out <=(others=>'0');
 	 END IF;
   END IF;
 END PROCESS; 
