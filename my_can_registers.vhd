@@ -28,10 +28,8 @@ entity my_can_registers is
 					  clr       : IN std_logic;
 					  wr        : IN std_logic;
 					  cs        : IN std_logic;
-					  int_i     : IN std_logic;
 					  data_in   : IN std_logic_vector(7 DOWNTO 0);
-					  addr      : IN std_logic_vector(6 DOWNTO 0);
-					  rst               : OUT std_logic;
+					  addr      : IN std_logic_vector(3 DOWNTO 0);
 					  sam               : OUT std_logic;
 					  acceptance_filter : OUT std_logic_vector(28 DOWNTO 0);
 	              acceptance_mask   : OUT std_logic_vector(28 DOWNTO 0);
@@ -45,8 +43,19 @@ end my_can_registers;
 
 architecture Behavioral of my_can_registers is
 
-TYPE memory IS ARRAY(0 to 127) OF std_logic_vector(7 DOWNTO 0);
-SIGNAL can_regs : memory;
+TYPE memory IS ARRAY(0 to 11) OF std_logic_vector(7 DOWNTO 0);
+SIGNAL can_regs : memory:=(others=>(others=>'0'));
+SIGNAL bus_timing_0 : std_logic_vector(7 DOWNTO 0);
+SIGNAL bus_timing_1 : std_logic_vector(7 DOWNTO 0);
+SIGNAL acc_mask_0 : std_logic_vector(7 DOWNTO 0);
+SIGNAL acc_mask_1 : std_logic_vector(7 DOWNTO 0);
+SIGNAL acc_mask_2 : std_logic_vector(7 DOWNTO 0);
+SIGNAL acc_mask_3 : std_logic_vector(7 DOWNTO 0);
+SIGNAL acc_filt_0 : std_logic_vector(7 DOWNTO 0);
+SIGNAL acc_filt_1 : std_logic_vector(7 DOWNTO 0);
+SIGNAL acc_filt_2 : std_logic_vector(7 DOWNTO 0);
+SIGNAL acc_filt_3 : std_logic_vector(7 DOWNTO 0);
+
 begin
        
 bus_timing_0 <= can_regs(1);
@@ -59,7 +68,6 @@ acc_filt_0   <= can_regs(7);
 acc_filt_1   <= can_regs(8);
 acc_filt_2   <= can_regs(9);
 acc_filt_3   <= can_regs(10);
-
 		 
 PROCESS(clk,clr) 
 BEGIN
@@ -67,7 +75,7 @@ BEGIN
 	can_regs<=(others=>(others=>'0'));
   ELSIF(rising_edge(clk)) THEN
     IF((cs and wr)='1') THEN
-	  can_regs(to_integer(unsigned(addr)))<=data_in;
+	  can_regs(to_integer(unsigned(addr)))<= data_in;
 	 END IF ;
   END IF ;
 END PROCESS;
@@ -79,17 +87,6 @@ BEGIN
   ELSIF(rising_edge(clk)) THEN
     IF((cs and not(wr))='1') THEN
 	  data_out<= can_regs(to_integer(unsigned(addr)));
-	 END IF;
-  END IF;
-END PROCESS;
-
-PROCESS(clk,clr)
-BEGIN
-  IF(clr='1') THEN
-   rst<='1'; 
-  ELSIF(rising_edge(clk)) THEN
-    IF(int_i='1') THEN
-	  rst <='0';
 	 END IF;
   END IF;
 END PROCESS;
