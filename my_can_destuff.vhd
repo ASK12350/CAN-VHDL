@@ -15,6 +15,7 @@ ENTITY my_can_bsp IS
 		    ide_out    : OUT std_logic;
 			 acf_en     : OUT std_logic;
 			 go_error   : OUT std_logic;
+			 msg_end    : OUT std_logic;
 			 id         : OUT std_logic_vector(28 DOWNTO 0) ;
 		    reset_mode : OUT std_logic;
 		       data_out    : OUT std_logic_vector(7 DOWNTO 0));
@@ -93,11 +94,10 @@ SIGNAL ack          : std_logic;
 SIGNAL ack_de       : std_logic;
 
 --writing into temporary storage
-TYPE data_array IS ARRAY(0 TO 12) OF std_logic_vector(7 DOWNTO 0);
-SIGNAL data_fifo    : data_array;
+TYPE msg_array IS ARRAY(0 TO 12) OF std_logic_vector(7 DOWNTO 0);
+SIGNAL msg_buffer   : msg_array;
 SIGNAL wr           : std_logic;
-SIGNAL i            : integer range  0 to 7;
-
+SIGNAL i            : integer range  0 to 12;
 --destuff
 SIGNAL destuff      : std_logic;
 SIGNAL destuff_en   : std_logic;
@@ -115,7 +115,8 @@ SIGNAL crc_temp      : std_logic_vector(14 DOWNTO 0);
 --fifo
 SIGNAL wr_fifo      : std_logic;
 SIGNAL cs_fifo      : std_logic;
-SIGNAL wr_cnt       : integer range 0 TO 7 ;
+SIGNAL wr_cnt       : integer range 0 TO 12 ;
+SIGNAL msg_len      : integer range 0 TO 12 ;
 
 SIGNAL remote_frame    : std_logic;
 
@@ -138,6 +139,9 @@ uucrc : my_can_crc PORT MAP    (    clk=>clk,
 
 
 ide_out <=ide;
+msg_len <=12 WHEN (not(remote_frame) and conv(dlc(3)='1')) ='1' ELSE
+          to_integer(unsigned(dlc))+4 WHEN remote_frame='0' ELSE
+          4;
 
 --crc signals
 crc_enable <= crc_en and sample_point and not(destuff);
@@ -180,12 +184,17 @@ dlc_int         <= 63 WHEN dlc(3)='1' ELSE
 PROCESS(clk,rst)
 BEGIN
   IF(rst='1') THEN
-   data_fifo<=(others=>(others=>'0'));
+   msg_buffer<=(others=>(others=>'0'));
   ELSIF(rising_edge(clk)) THEN
+   msg_buffer(0)    <= id1(10 DOWNTO 3);
+   msg_buffer(1)    <= id1(2 DOWNTO 0) & ide & dlc;
+   msg_buffer(2)    <= remote_frame & "00000" & id2(17 DOWNTO 16);
+   msg_buffer(3)    <= id2(15 DOWNTO 8);
+   msg_buffer(4)    <= id2(7 DOWNTO 0);
     IF(wr='1') THEN
-	  data_fifo(i)<=data_temp;
+	  msg_buffer(i)<=data_temp;
 	 ELSIF(rx_idle='1') THEN
-	  data_fifo<=(others=>(others=>'0'));
+	  msg_buffer<=(others=>(others=>'0'));
 	 END IF;
   END IF;
 END PROCESS;
@@ -194,12 +203,12 @@ END PROCESS;
 PROCESS(clk,rst)
 BEGIN
   IF(rst='1') THEN
-   i<=0;
+   i<=5;
   ELSIF(rising_edge(clk)) THEN
     IF(wr='1') THEN
  	  i<=i+1;
 	 ELSIF(rx_idle='1') THEN
-	  i<=0;
+	  i<=5;
 	 END IF;
   END IF;
 END PROCESS;
@@ -210,7 +219,7 @@ BEGIN
   IF(rst='1') THEN
    wr<='0';
   ELSIF(rising_edge(clk)) THEN
-    IF((sample_point and rx_data) ='1') THEN 
+    IF((sample_point and rx_data  and not(destuff)) ='1') THEN 
 	   IF(to_unsigned(cnt,6)(2 DOWNTO 0)="111") THEN
 	    wr<='1';
 	   END IF;
@@ -553,12 +562,12 @@ END PROCESS;
 PROCESS(clk,rst) 
 BEGIN
   IF(rst='1') THEN
-   id2 <= (others=>'1');
+   id2 <= (others=>'0');
   ELSIF(rising_edge(clk)) THEN
     IF((rx_id2 and sample_point and not(destuff))='1') THEN
      id2 <=	id2(16 DOWNTO 0) & sampled_bit_q;
     ELSIF(rx_idle='1') THEN
-	  id2 <= (others=> '1');
+	  id2 <= (others=> '0');
 	 END IF;
   END IF;
 END PROCESS;
@@ -775,9 +784,9 @@ BEGIN
   IF(rst='1') THEN
    cs_fifo <='0';
   ELSIF(rising_edge(clk)) THEN
-    IF((go_rx_inter and id_ok and not(remote_frame))='1') THEN
+    IF((go_rx_inter and id_ok)='1') THEN
 	  cs_fifo <='1';
-	 ELSIF(wr_cnt+1=to_integer(unsigned(dlc))) THEN
+	 ELSIF(wr_cnt=msg_len) THEN
 	  cs_fifo <='0';
 	 END IF;
   END IF;
@@ -789,9 +798,9 @@ BEGIN
   IF(rst='1') THEN
    wr_fifo <='0';
   ELSIF(rising_edge(clk)) THEN
-    IF((go_rx_inter and id_ok and not(remote_frame))='1') THEN
+    IF((go_rx_inter and id_ok)='1') THEN
 	  wr_fifo <='1';
-	 ELSIF(wr_cnt+1=to_integer(unsigned(dlc))) THEN
+	 ELSIF(wr_cnt=msg_len) THEN
 	  wr_fifo <='0';
 	 END IF;
   END IF;
@@ -803,8 +812,8 @@ BEGIN
   IF(rst='1') THEN
    wr_cnt <=0;
   ELSIF(rising_edge(clk)) THEN
-    IF((cs_fifo and wr_fifo and not(remote_frame))='1') THEN
-	   IF(wr_cnt+1=to_integer(unsigned(dlc))) THEN
+    IF((cs_fifo and wr_fifo )='1') THEN
+	   IF(wr_cnt=msg_len) THEN
 		 wr_cnt <=0;
 		ELSE
 		 wr_cnt <=wr_cnt+1;
@@ -813,14 +822,27 @@ BEGIN
   END IF;
 END PROCESS;
 
---data sent into fifo 
 PROCESS(clk,rst)
 BEGIN
   IF(rst='1') THEN
+   msg_end <='0';
+  ELSIF(rising_edge(clk)) THEN
+    IF(wr_cnt=msg_len) THEN
+	  msg_end <='1';
+	 ELSE
+	  msg_end <='0';
+	 END IF;
+  END IF;
+END PROCESS;
+
+--data sent into fifo 
+PROCESS(clk,rst)
+BEGIN 
+  IF(rst='1') THEN
    data_out <= (others=>'0') ;
   ELSIF(rising_edge(clk)) THEN 
-    IF((cs_fifo and wr_fifo and not(remote_frame))='1') THEN
-	  data_out <=data_fifo(wr_cnt);
+    IF((cs_fifo and wr_fifo)='1') THEN
+	  data_out <=msg_buffer(wr_cnt);
 	 ELSE
 	  data_out <=(others=>'0');
 	 END IF;
