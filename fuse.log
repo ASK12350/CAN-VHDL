@@ -1,0 +1,34 @@
+Running: D:\Xilinx\ISE_DS\ISE\bin\nt\unwrapped\fuse.exe -intstyle ise -incremental -o D:/temp/my_can/my_can_top_tb_isim_beh.exe -prj D:/temp/my_can/my_can_top_tb_beh.prj work.my_can_top_tb 
+ISim O.87xd (signature 0x2f00eba5)
+Number of CPUs detected in this system: 2
+Turning on mult-threading, number of parallel sub-compilation jobs: 4 
+Determining compilation order of HDL files
+Parsing VHDL file "D:/temp/my_can/my_can_crc.vhd" into library work
+Parsing VHDL file "D:/temp/my_can/my_can_registers.vhd" into library work
+Parsing VHDL file "D:/temp/my_can/my_can_fifo.vhd" into library work
+Parsing VHDL file "D:/temp/my_can/my_can_btl.vhd" into library work
+Parsing VHDL file "D:/temp/my_can/my_can_bsp.vhd" into library work
+Parsing VHDL file "D:/temp/my_can/my_can_acf.vhd" into library work
+Parsing VHDL file "D:/temp/my_can/my_can_top.vhd" into library work
+Parsing VHDL file "D:/temp/my_can/my_can_top_tb.vhd" into library work
+Starting static elaboration
+Completed static elaboration
+Fuse Memory Usage: 104848 KB
+Fuse CPU Usage: 545 ms
+Compiling package standard
+Compiling package std_logic_1164
+Compiling package numeric_std
+Compiling architecture behavioral of entity my_can_fifo [my_can_fifo_default]
+Compiling architecture behavioral of entity my_can_btl [my_can_btl_default]
+Compiling architecture behavioral of entity my_can_crc [my_can_crc_default]
+Compiling architecture behavioral of entity my_can_bsp [my_can_bsp_default]
+Compiling architecture behavioral of entity my_can_acf [my_can_acf_default]
+Compiling architecture behavioral of entity my_can_registers [my_can_registers_default]
+Compiling architecture behavioral of entity my_can_top [my_can_top_default]
+Compiling architecture behavior of entity my_can_top_tb
+Time Resolution for simulation is 1ps.
+Waiting for 7 sub-compilation(s) to finish...
+Compiled 18 VHDL Units
+Built simulation executable D:/temp/my_can/my_can_top_tb_isim_beh.exe
+Fuse Memory Usage: 120384 KB
+Fuse CPU Usage: 1091 ms
