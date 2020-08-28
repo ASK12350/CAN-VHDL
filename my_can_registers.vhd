@@ -26,8 +26,7 @@ entity my_can_registers is
            PORT(
 			        clk       : IN std_logic;
 					  clr       : IN std_logic;
-					  wr        : IN std_logic;
-					  cs        : IN std_logic;
+					  wr_en     : IN std_logic;
 					  data_in   : IN std_logic_vector(7 DOWNTO 0);
 					  addr      : IN std_logic_vector(3 DOWNTO 0);
 					  sam               : OUT std_logic;
@@ -37,13 +36,14 @@ entity my_can_registers is
 	              brp       		  : OUT std_logic_vector(5 DOWNTO 0);
 	              tseg1     		  : OUT std_logic_vector(3 DOWNTO 0);
 	              tseg2   			  : OUT std_logic_vector(2 DOWNTO 0);
-					  data_out  		  : OUT std_logic_vector(7 DOWNTO 0));
+					  clk_out_div       : OUT std_logic_vector(2 DOWNTO 0);
+					  clk_out_off       : OUT std_logic);
 					  
 end my_can_registers;
 
 architecture Behavioral of my_can_registers is
 
-TYPE memory IS ARRAY(0 to 11) OF std_logic_vector(7 DOWNTO 0);
+TYPE memory IS ARRAY(0 to 15) OF std_logic_vector(7 DOWNTO 0);
 SIGNAL can_regs : memory:=(others=>(others=>'0'));
 SIGNAL bus_timing_0 : std_logic_vector(7 DOWNTO 0);
 SIGNAL bus_timing_1 : std_logic_vector(7 DOWNTO 0);
@@ -55,6 +55,7 @@ SIGNAL acc_filt_0 : std_logic_vector(7 DOWNTO 0);
 SIGNAL acc_filt_1 : std_logic_vector(7 DOWNTO 0);
 SIGNAL acc_filt_2 : std_logic_vector(7 DOWNTO 0);
 SIGNAL acc_filt_3 : std_logic_vector(7 DOWNTO 0);
+SIGNAL cmd_reg    : std_logic_vector(7 DOWNTO 0);
 
 begin
        
@@ -68,27 +69,17 @@ acc_filt_0   <= can_regs(7);
 acc_filt_1   <= can_regs(8);
 acc_filt_2   <= can_regs(9);
 acc_filt_3   <= can_regs(10);
+cmd_reg      <= can_regs(11);
 		 
 PROCESS(clk,clr) 
 BEGIN
   IF(clr='1') THEN
 	can_regs<=(others=>(others=>'0'));
   ELSIF(rising_edge(clk)) THEN
-    IF((cs and wr)='1') THEN
+    IF(wr_en ='1') THEN
 	  can_regs(to_integer(unsigned(addr)))<= data_in;
 	 END IF ;
   END IF ;
-END PROCESS;
-
-PROCESS(clk,clr)
-BEGIN
-  If(clr='1') THEN
-   data_out <= (others=>'0');
-  ELSIF(rising_edge(clk)) THEN
-    IF((cs and not(wr))='1') THEN
-	  data_out<= can_regs(to_integer(unsigned(addr)));
-	 END IF;
-  END IF;
 END PROCESS;
 
 sam   <= bus_timing_1(7);
@@ -96,6 +87,8 @@ tseg2 <= bus_timing_1(6 DOWNTO 4);
 tseg1 <= bus_timing_1(3 DOWNTO 0);
 sjw   <= bus_timing_0(7 DOWNTO 6);
 brp   <= bus_timing_0(5 DOWNTO 0);
+clk_out_div <=cmd_reg(2 DOWNTO 0);
+clk_out_off <=cmd_reg(3);
 
 acceptance_filter <= acc_filt_0 & acc_filt_1 & acc_filt_2 & acc_filt_3(4 DOWNTO 0);
 acceptance_mask   <= acc_mask_0 & acc_mask_1 & acc_mask_2 & acc_mask_3(4 DOWNTO 0); 
