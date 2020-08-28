@@ -43,12 +43,14 @@ ARCHITECTURE behavior OF my_can_top_tb IS
          rx : IN  std_logic;
 			wr : IN std_logic;
 			cs : IN std_logic;
+			addr_i : IN std_logic;
 			addr : IN std_logic_vector(3 DOWNTO 0);
 			data_in : IN std_logic_vector(7 DOWNTO 0);
          tx_in : IN  std_logic;
          transmitter : IN  std_logic;
 			go_error : out std_logic;
 			tx_out : out std_logic;
+			clk_out : out std_logic;
 			data_out : OUT std_logic_vector(7 DOWNTO 0)
         );
     END COMPONENT;
@@ -62,6 +64,7 @@ ARCHITECTURE behavior OF my_can_top_tb IS
 	signal clr_1 : std_logic :='0';
 	signal wr_1 : std_logic :='0';
 	signal cs_1 : std_logic :='0';
+	signal addr_i_1 : std_logic :='0';
 	signal addr_1 : std_logic_vector(3 DOWNTO 0) := "0000";
 	signal data_in_1 : std_logic_vector(7 DOWNTO 0) := (others=>'0');
 	signal data_out_1 : std_logic_vector(7 downto 0) ;
@@ -70,8 +73,8 @@ ARCHITECTURE behavior OF my_can_top_tb IS
  	--Outputs
 	--signal sampled_bit_1: std_logic;
 	--signal sample_point_1 : std_logic;
-	signal tx_out_1 : std_logic;
-	
+	signal tx_out_1  : std_logic;
+	signal clk_out_1 : std_logic;  
 	
    --Inputs
    signal clk_2 : std_logic := '0';
@@ -80,6 +83,7 @@ ARCHITECTURE behavior OF my_can_top_tb IS
 	signal clr_2 : std_logic :='0';
 	signal wr_2 : std_logic :='0';
 	signal cs_2 : std_logic :='0';
+	signal addr_i_2 : std_logic :='0';
 	signal addr_2 : std_logic_vector(3 DOWNTO 0) := "0000";
 	signal data_in_2 : std_logic_vector(7 DOWNTO 0) := (others=>'0');
 	signal data_out_2 : std_logic_vector(7 downto 0) ;
@@ -87,9 +91,9 @@ ARCHITECTURE behavior OF my_can_top_tb IS
  	--Outputs
 	--signal sampled_bit_2: std_logic;
 	--signal sample_point_2 : std_logic;
-	signal tx_out_2 : std_logic;
+	signal tx_out_2  : std_logic;
+	signal clk_out_2 : std_logic;  
 
-	
 	
    --Inputs
    signal clk_3 : std_logic := '0';
@@ -98,6 +102,7 @@ ARCHITECTURE behavior OF my_can_top_tb IS
 	signal clr_3 : std_logic :='0';
 	signal wr_3 : std_logic :='0';
 	signal cs_3 : std_logic :='0';
+	signal addr_i_3 : std_logic :='0';
 	signal addr_3 : std_logic_vector(3 DOWNTO 0) := "0000";
 	signal data_in_3 : std_logic_vector(7 DOWNTO 0) := (others=>'0');
    signal data_out_3 : std_logic_vector(7 downto 0) ;
@@ -105,8 +110,8 @@ ARCHITECTURE behavior OF my_can_top_tb IS
  	--Outputs
 	--signal sampled_bit_3 : std_logic;
 	--signal sample_point_3 : std_logic;
-  	signal tx_out_3 : std_logic;
-
+  	signal tx_out_3  : std_logic;
+   signal clk_out_3 : std_logic;  
   
   SIGNAL bus_level : std_logic;
    -- Clock period definitions
@@ -132,6 +137,8 @@ BEGIN
 			 wr =>wr_1,
 			 cs =>cs_1,
 			 addr=>addr_1,
+			 addr_i=>addr_i_1,
+			 clk_out=>clk_out_1,
 			 data_in=>data_in_1,
 			 data_out=>data_out_1,
 			 go_error=>go_error_1,
@@ -147,6 +154,8 @@ BEGIN
 			 wr =>wr_2,
 			 cs =>cs_2,
 			 addr=>addr_2,
+			 addr_i=>addr_i_2,
+			 clk_out=>clk_out_2,
 			 data_in=>data_in_2,
 			 data_out=>data_out_2,
 			 go_error=>go_error_2,
@@ -162,6 +171,8 @@ BEGIN
 			 wr =>wr_3,
 			 cs =>cs_3,
 			 addr=>addr_3,
+			 addr_i=>addr_i_3,
+			 clk_out=>clk_out_3,
 			 data_in=>data_in_3,
 			 data_out=>data_out_3,
 			 go_error=>go_error_3,
@@ -213,7 +224,7 @@ BEGIN
 	 cs_1 <='0';
 	 cs_2 <='0';
 	 cs_3 <='0';
-	 wait for 570 ns;
+	 wait for 590 ns;
 	 cs_1 <='1';
 	 cs_2 <='1';
 	 cs_3 <='1';
@@ -228,12 +239,12 @@ BEGIN
 	begin
 	  wr_1 <='0';
 	  wr_2 <='0';
-	  wr_3 <='0';
+	  wr_3 <='0';                            --write signal to write the values of sjw,brp,etc
 	  wait for 600 ns;
 	  wr_1 <='1';
 	  wr_2 <='1';
 	  wr_3 <='1';
-	  wait for 240 ns;
+	  wait for 260 ns;
 	  wr_1 <='0';
 	  wr_2 <='0';
 	  wr_3 <='0';
@@ -245,7 +256,7 @@ BEGIN
 	  data_in_1 <=(others=>'0');
 	  data_in_2 <=(others=>'0');
 	  data_in_3 <=(others=>'0');
-	 wait for 615 ns;
+	 wait for 620 ns;
 	  data_in_1 <="11000011";              -- sjw = data(7 downto 6):="11"
 	  data_in_2 <="11000011";              -- brp = data(5 DOWNTO 0):= "000011"
 	  data_in_3 <="11000011";
@@ -286,7 +297,11 @@ BEGIN
 	  data_in_2 <="00001100";              --acc_filt_3 = "00001100"         
 	  data_in_3 <="00000101";              --acc_filt_3 = "00000101"
 	 wait for 20 ns;
-	  data_in_1 <=(others=>'0');
+	  data_in_1 <="00000010";
+	  data_in_2 <="00000010";
+	  data_in_3 <="00000010";
+	 wait for 20 ns;
+	  data_in_1 <=(others=>'0');        --sjw="11"  brp="000011" tseg1="1000" tseg2="011" clk_out_div="010" clk_out_off='0'
 	  data_in_2 <=(others=>'0');
 	  data_in_3 <=(others=>'0');
 	 wait;
@@ -294,10 +309,13 @@ BEGIN
 	
 	addr:process
 	begin
+	 addr_i_1 <='0';
+	 addr_i_2 <='0';
+	 addr_i_3 <='0';
 	 addr_1 <=(others=>'0');
 	 addr_2 <=(others=>'0');
 	 addr_3 <=(others=>'0');
-	wait for 615 ns;
+	wait for 620 ns;
 	 addr_1 <="0001";
 	 addr_2 <="0001";
 	 addr_3 <="0001";
@@ -342,6 +360,9 @@ BEGIN
 	 addr_2 <="1011";
 	 addr_3 <="1011";
 	wait for 20 ns;
+	 addr_i_1 <='1';
+	 addr_i_2 <='1';
+	 addr_i_3 <='1';
 	 addr_1 <=(others=>'0');
 	 addr_2 <=(others=>'0');
 	 addr_3 <=(others=>'0');
