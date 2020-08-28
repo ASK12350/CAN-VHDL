@@ -12,10 +12,16 @@ ENTITY my_can_btl IS
 	     rst             : IN std_logic;
 		  reset_mode      : IN std_logic;
 		  sam					: IN std_logic;
+		  clk_out_off     : IN std_logic;
+		  tx              : IN std_logic;
+		  transmitter_orig: IN std_logic;
+		  transmitting    : IN std_logic;
+		  clk_out_div     : IN std_logic_vector(2 DOWNTO 0);
 	     sjw             : IN std_logic_vector(1 DOWNTO 0);
 	     brp             : IN std_logic_vector(5 DOWNTO 0);
 	     tseg1           : IN std_logic_vector(3 DOWNTO 0);
 	     tseg2           : IN std_logic_vector(2 DOWNTO 0);
+		         clk_out           : OUT std_logic;
 		         sampled_bit_q     : OUT std_logic;
 		         tx_out            : OUT std_logic;
 		         sample_point      : OUT std_logic;
@@ -39,6 +45,7 @@ END ;
 SIGNAL rx_q     : std_logic;
 SIGNAL rx_edge  : std_logic;
 SIGNAL clk_en   : std_logic;
+SIGNAL clk_out_temp : std_logic;
 SIGNAL rx_idle  : std_logic;
 SIGNAL s_reg    : std_logic_vector(2 DOWNTO 0);
 SIGNAL hard_sync_temp : std_logic;
@@ -54,12 +61,14 @@ SIGNAL go_tseg2 : std_logic;
 SIGNAL rx_sync : std_logic;
 SIGNAL rx_tseg1 : std_logic;
 SIGNAL rx_tseg2 : std_logic;
+SIGNAL cnt_clk_out : integer range 0 to 15;
 BEGIN 
 
 go_sync <=clk_en and rx_tseg2 and conv(cnt2=to_integer(unsigned(tseg2))) and conv(delaye=0);
 go_tseg1 <=hard_sync_temp or (clk_en and rx_sync) or(clk_en and rx_tseg2 and conv(delaye/=0) and conv(cnt2>=to_integer(unsigned(tseg2))-delaye));
 go_tseg2 <=clk_en and rx_tseg1 and conv(cnt2=to_integer(unsigned(tseg1))+delayl); 
 
+clk_out <= clk_out_temp;
 sampled_bit <=sampled_bit_temp;
 hard_sync <= hard_sync_temp;
 rx_edge <= NOT(rx_q) AND rx_q_q ;
@@ -78,6 +87,33 @@ IF(rising_edge(clk))THEN
  rx_q_q <= rx_q;
 END IF;
 END PROCESS;
+
+clk_out_proc:PROCESS(clk,rst)
+BEGIN 
+  IF(rst='1') THEN
+   clk_out_temp <='0';
+  ELSIF(rising_edge(clk)) THEN
+    IF(clk_out_off='1') THEN
+	  clk_out_temp <='0';
+	 ELSIF(cnt_clk_out=to_integer(unsigned(clk_out_div & '0'))+1) THEN
+	  clk_out_temp <= not(clk_out_temp);
+	 END IF;
+  END IF;
+END PROCESS;
+
+clk_out_cnt:PROCESS(clk,rst)
+BEGIN
+  IF(rst='1') THEN
+   cnt_clk_out<=0;
+  ELSIF(rising_edge(clk)) THEN
+    IF(clk_out_off='1' or cnt_clk_out=(to_integer(unsigned(clk_out_div & '0'))+1)) THEN
+	  cnt_clk_out <=0;
+	 ELSE
+	  cnt_clk_out <=cnt_clk_out+1;
+	 END IF;
+  END IF;
+END PROCESS;
+	 
 
 --Hard_synchronization
 
